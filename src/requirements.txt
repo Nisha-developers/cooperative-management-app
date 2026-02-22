@@ -1,0 +1,14 @@
+django
+psycopg[binary]
+djangorestframework
+redis
+django-redis
+celery[redis]
+drf-spectacular
+djangorestframework-simplejwt
+requests
+django-cors-headers
+Pillow
+whitenoise==6.7.0
+dj-database-url==3.0.1
+gunicorn
