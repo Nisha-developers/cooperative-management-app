@@ -4,7 +4,6 @@ from .managers import CustomUserManager
 import random
 from django.utils import timezone
 from datetime import timedelta
-from api.v1.school.models import School, Department
 
 # Create your models here.
 
@@ -22,7 +21,7 @@ class User(AbstractUser):
     )
     
     USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['username', 'role'] 
+    REQUIRED_FIELDS = ['username'] 
     verification_code = models.CharField(max_length=6, blank=True, null=True)
     code_expiry = models.DateTimeField(blank=True, null=True)
     email_verified = models.BooleanField(default=False)
