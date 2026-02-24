@@ -54,8 +54,8 @@ export default function MarqueeTicker() {
         }
       `}</style>
 
-      <MarqueeRow items={row1} direction="left" speed={25} />
-      <MarqueeRow items={row2} direction="right" speed={25} />
+      <MarqueeRow items={row1} direction="left" speed={37} />
+      <MarqueeRow items={row2} direction="right" speed={37} />
     </div>
   );
 }
