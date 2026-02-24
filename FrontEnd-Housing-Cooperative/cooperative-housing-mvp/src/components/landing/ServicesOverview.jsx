@@ -130,7 +130,7 @@ function ServiceCard({ service, isActive, onToggle }) {
   return (
     <div
       onClick={onToggle}
-      style={{ backgroundColor: isActive ? "#FFECD1" : "#0a2236" }}
+      style={{ backgroundColor: isActive ? "#FFECD1" : "#2E7D32" }}
       className="relative cursor-pointer px-8 py-8 overflow-hidden border border-white/5 transition-colors duration-300 h-full"
     >
       <span className="absolute top-3 right-5 text-[5rem] font-black leading-none select-none pointer-events-none text-white/5">

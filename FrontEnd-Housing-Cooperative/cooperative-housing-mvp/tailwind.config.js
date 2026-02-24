@@ -7,11 +7,11 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        'cooperative-cream': '#FFECD1',   // Background
-        'cooperative-dark': '#001524',    // Primary text
-        'cooperative-orange': '#FF7D00',  // Accent buttons/links
-        'cooperative-teal': '#15616D',    // Secondary elements
-        'cooperative-brown': '#78290F',   // Headers/highlights
+        'cooperative-cream': '#FDF6EC',   // Background
+        'cooperative-dark': '#003000',    // Primary text
+        'cooperative-orange': '#F57C00',  // Accent buttons/links
+        'cooperative-teal': '#2E7D32',    // Secondary elements
+        'cooperative-brown': '#2E7D32',   // Headers/highlights
       },
       fontFamily: {
         sans: ['Inter', 'ui-sans-serif', 'system-ui'],
