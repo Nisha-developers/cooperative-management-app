@@ -192,7 +192,7 @@ export default function ContactUs() {
           </AnimateOnScroll>
 
           {/* RIGHT — Form slides in from right */}
-          <AnimateOnScroll variant={fadeLeft} delay={0.2} duration={0.7}>
+          <AnimateOnScroll variant={fadeRight} delay={0.2} duration={0.7}>
             <div className="bg-cooperative-dark border border-white/5 px-8 py-10 flex flex-col justify-between">
 
               <div>

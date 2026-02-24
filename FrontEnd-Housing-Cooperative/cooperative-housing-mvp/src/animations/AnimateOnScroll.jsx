@@ -21,9 +21,9 @@ export const fadeLeft = {
 };
 
 export const fadeRight = {
-  hidden: { opacity: 0, x: 60 },
+  hidden: { opacity: 0, x: 20 },
   visible: { opacity: 1, x: 0 },
-  exit: { opacity: 0, x: -60 },
+  exit: { opacity: 0, x: -20 },
 };
 
 export const scaleIn = {
