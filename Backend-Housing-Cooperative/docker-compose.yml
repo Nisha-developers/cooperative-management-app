@@ -38,13 +38,19 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: cooperative_celery
-    command: cooperative -A config worker --loglevel=info
+    command: celery -A config worker --loglevel=info
     volumes:
       - ./src:/app
     depends_on:
       - redis
       - web
+      - mail
     env_file:
       - .env
+ mail:
+    image: mailhog/mailhog
+    container_name: cooperative_mail
+    ports:
+      - 8025:8025
 volumes:
   postgres_db:

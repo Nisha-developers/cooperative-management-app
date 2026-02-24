@@ -161,7 +161,9 @@ CELERY_TASK_SERIALIZER = 'json'
 
 # DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
-EMAIL_HOST = "LogWeb_mail"
+EMAIL_HOST = "mail"
 EMAIL_PORT = 1025
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+
+DEFAULT_FROM_EMAIL = "Bethel Housing Cooperative <noreply@myapp.com>"
 CORS_ALLOW_ALL_ORIGINS = True

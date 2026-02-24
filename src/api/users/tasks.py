@@ -21,7 +21,7 @@ def send_verification_email(to_email, code):
     send_mail(
         subject="Verify Your Email",
         message=f"Your verification code is: {code}. It will expire in 3 minutes",
-        from_email=f"SIWES LOGBOOK TRACKER <{settings.EMAIL_HOST}>",
+        from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=[to_email],
         fail_silently=False,
     )

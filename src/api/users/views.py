@@ -12,17 +12,28 @@ from django.shortcuts import get_object_or_404
 from rest_framework_simplejwt.tokens import RefreshToken
 from .models import User
 
+
 class UserRegistrationView(APIView):
     def post(self, request):
         serializer = UserRegistrationSerializer(data=request.data)
+
         if serializer.is_valid():
             user = serializer.save()
+
             code = user.generate_verification_code()
-            email = user.email
-            send_verification_email(email, code)
-            return Response({"message": "Email sent"})
+            send_verification_email(user.email, code)
+
+            if user.is_admin:
+                return Response(
+                    {"message": "Admin user created successfully, email sent"},
+                    status=status.HTTP_201_CREATED
+                )
+
+            return Response({"message": "Email sent"}, status=status.HTTP_201_CREATED)
+
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
+
 class ResendVerificationCodeView(APIView):
     def post(self, request):
         email = request.data.get("email")
