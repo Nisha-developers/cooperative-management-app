@@ -1,0 +1,44 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { @apply scroll-smooth; }
+  body { @apply bg-cooperative-cream text-cooperative-dark font-sans antialiased; }
+}
+@layer components {
+  /* Primary button — orange accent */
+  .btn-primary {
+    @apply bg-cooperative-orange text-white px-6 py-2.5 rounded-lg font-medium
+           hover:bg-orange-600 active:scale-95 transition-all duration-150;
+  }
+
+  /* Secondary button — teal outline */
+  .btn-secondary {
+    @apply border border-cooperative-teal text-cooperative-teal px-6 py-2.5 rounded-lg font-medium
+           hover:bg-cooperative-teal/10 active:scale-95 transition-all duration-150;
+  }
+
+  /* Card — white background with subtle shadow */
+  .card {
+    @apply bg-white rounded-2xl shadow-sm border border-gray-100 p-6;
+  }
+
+  /* Input field — teal focus ring */
+  .input-field {
+    @apply w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm
+           focus:outline-none focus:ring-2 focus:ring-cooperative-teal/30 focus:border-cooperative-teal
+           transition-all duration-150;
+  }
+
+  /* Headers/highlights — reddish-brown */
+  .header-highlight {
+    @apply text-cooperative-brown font-bold;
+  }
+  .header-title-light{
+    @apply text-cooperative-brown font-bold text-[20px] tracking-[1rem] text-center pt-[4rem] pb-[2rem]
+  }
+   .header-title-dark{
+    @apply text-cooperative-cream font-bold text-[20px] tracking-[1rem] text-center pt-[4rem] pb-[2rem]
+  }
+}
