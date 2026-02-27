@@ -55,14 +55,11 @@ class WalletSerializer(serializers.ModelSerializer):
 
 
 class WalletSummarySerializer(serializers.ModelSerializer):
-    """Lightweight serializer without nested transactions — use this in list views or user profiles."""
-    user = serializers.StringRelatedField(read_only=True)
 
     class Meta:
         model = Wallet
         fields = [
             "uid",
-            "user",
             "balance",
             "created_on",
             "updated_on",

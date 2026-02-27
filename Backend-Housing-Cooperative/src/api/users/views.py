@@ -3,13 +3,14 @@ from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied
 from rest_framework import status, permissions
 from .models import User
-from .serializers import UserRegistrationSerializer
+from .serializers import CustomTokenObtainPairSerializer, UserRegistrationSerializer
 from rest_framework.permissions import IsAuthenticated 
 from rest_framework.parsers import MultiPartParser, FormParser
 from .tasks import send_verification_email
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.views import TokenObtainPairView
 from .models import User
 
 
@@ -76,3 +77,6 @@ class VerifyCodeView(APIView):
             "access": str(refresh.access_token),
             "refresh": str(refresh)
         }, status=200)
+        
+class CustomTokenObtainPairView(TokenObtainPairView):
+    serializer_class = CustomTokenObtainPairSerializer
