@@ -2,8 +2,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied
 from rest_framework import status, permissions
-from .models import User
-from .serializers import CustomTokenObtainPairSerializer, UserRegistrationSerializer
+from .models import User, UserProfile
+from .serializers import CustomTokenObtainPairSerializer, UserRegistrationSerializer, UserProfileSerializer
 from rest_framework.permissions import IsAuthenticated 
 from rest_framework.parsers import MultiPartParser, FormParser
 from .tasks import send_verification_email
@@ -80,3 +80,37 @@ class VerifyCodeView(APIView):
         
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
+
+
+class UserProfileView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_profile(self, user):
+        profile, _ = UserProfile.objects.get_or_create(user=user)
+        return profile
+
+    def get(self, request):
+        profile = self.get_profile(request.user)
+        serializer = UserProfileSerializer(profile)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        profile, created = UserProfile.objects.get_or_create(user=request.user)
+        if not created:
+            return Response(
+                {"error": "Profile already exists. Use PATCH to update."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        serializer = UserProfileSerializer(profile, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def patch(self, request):
+        profile = self.get_profile(request.user)
+        serializer = UserProfileSerializer(profile, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

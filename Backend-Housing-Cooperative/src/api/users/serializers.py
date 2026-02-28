@@ -3,7 +3,7 @@ from api.wallet.models import Wallet
 from api.wallet.serializers import WalletSummarySerializer
 from rest_framework import serializers
 from django.core.exceptions import ObjectDoesNotExist
-from .models import  User
+from .models import  User, UserProfile
 
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
@@ -58,3 +58,12 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         })
 
         return data
+    
+class UserProfileSerializer(serializers.ModelSerializer):
+    email = serializers.EmailField(source='user.email', read_only=True)
+    full_name = serializers.CharField(source='user.full_name', read_only=True)
+
+    class Meta:
+        model = UserProfile
+        fields = ['id', 'email', 'full_name', 'phone_number', 'account_number', 'bank_name', 'address', 'updated_at']
+        read_only_fields = ['id', 'email', 'full_name', 'updated_at']
