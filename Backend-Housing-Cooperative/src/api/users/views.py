@@ -1,6 +1,8 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied
+from django.core.exceptions import ObjectDoesNotExist
+from api.wallet.serializers import WalletSummarySerializer
 from rest_framework import status, permissions
 from .models import User, UserProfile
 from .serializers import CustomTokenObtainPairSerializer, UserRegistrationSerializer, UserProfileSerializer
@@ -81,6 +83,29 @@ class VerifyCodeView(APIView):
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
 
+class UserDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+
+        try:
+            wallet = user.wallet
+        except ObjectDoesNotExist:
+            wallet = None
+
+        wallet_data = WalletSummarySerializer(wallet).data if wallet else None
+
+        return Response({
+            "user": {
+                "id": user.id,
+                "email": user.email,
+                "username": user.username,
+                "full_name": user.full_name,
+                "is_admin": user.is_admin,
+            },
+            "wallet": wallet_data
+        }, status=status.HTTP_200_OK)
 
 class UserProfileView(APIView):
     permission_classes = [IsAuthenticated]
