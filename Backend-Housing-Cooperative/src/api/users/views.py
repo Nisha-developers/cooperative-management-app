@@ -1,3 +1,5 @@
+from rest_framework.generics import ListAPIView, RetrieveAPIView
+from config.permissions import IsAdminUserCustom
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied
@@ -5,7 +7,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from api.wallet.serializers import WalletSummarySerializer
 from rest_framework import status, permissions
 from .models import User, UserProfile
-from .serializers import CustomTokenObtainPairSerializer, UserRegistrationSerializer, UserProfileSerializer
+from .serializers import CustomTokenObtainPairSerializer, UserListSerializer, UserRegistrationSerializer, UserProfileSerializer, AdminUserDetailSerializer
 from rest_framework.permissions import IsAuthenticated 
 from rest_framework.parsers import MultiPartParser, FormParser
 from .tasks import send_verification_email
@@ -14,6 +16,13 @@ from django.shortcuts import get_object_or_404
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 from .models import User
+from rest_framework.pagination import PageNumberPagination
+
+
+class StandardResultsSetPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = "page_size"
+    max_page_size = 50
 
 
 class UserRegistrationView(APIView):
@@ -103,6 +112,7 @@ class UserDetailView(APIView):
                 "username": user.username,
                 "full_name": user.full_name,
                 "is_admin": user.is_admin,
+                "membership_id": user.membership_id
             },
             "wallet": wallet_data
         }, status=status.HTTP_200_OK)
@@ -139,3 +149,17 @@ class UserProfileView(APIView):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class UserListView(ListAPIView):
+    serializer_class = UserListSerializer
+    permission_classes = [IsAdminUserCustom]
+    pagination_class = StandardResultsSetPagination
+    
+    def get_queryset(self):
+        return User.objects.filter(is_admin=False).order_by("-id")
+
+class UserDetailByIdView(RetrieveAPIView):
+    queryset = User.objects.all()
+    serializer_class = AdminUserDetailSerializer
+    permission_classes = [IsAdminUserCustom]
+    lookup_field = "id"

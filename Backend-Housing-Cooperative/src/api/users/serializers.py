@@ -68,3 +68,47 @@ class UserProfileSerializer(serializers.ModelSerializer):
         model = UserProfile
         fields = ['id', 'email', 'full_name', 'phone_number', 'account_number', 'bank_name', 'address', 'updated_at']
         read_only_fields = ['id', 'email', 'full_name', 'updated_at']
+
+class UserListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = [
+            "id",
+            "username",
+            "email",
+            "full_name",
+            "membership_id",
+            "is_active",
+        ]
+
+class AdminUserDetailSerializer(serializers.ModelSerializer):
+    wallet = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = [
+            "id",
+            "email",
+            "username",
+            "full_name",
+            "is_admin",
+            "membership_id",
+            "wallet",
+        ]
+
+    def get_wallet(self, obj):
+        try:
+            wallet = obj.wallet
+            return WalletSummarySerializer(wallet).data
+        except ObjectDoesNotExist:
+            return None
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+
+        wallet_data = representation.pop("wallet")
+
+        return {
+            "user": representation,
+            "wallet": wallet_data
+        }
