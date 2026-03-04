@@ -53,6 +53,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
                 "username": user.username,
                 "full_name": user.full_name,
                 "is_admin": user.is_admin,
+                "membership_id": user.membership_id
             },
             "wallet": wallet_data
         })
