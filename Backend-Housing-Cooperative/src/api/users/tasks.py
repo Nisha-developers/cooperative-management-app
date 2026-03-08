@@ -25,3 +25,12 @@ def send_verification_email(to_email, code):
         recipient_list=[to_email],
         fail_silently=False,
     )
+    
+def send_password_code(to_email, code):
+    send_mail(
+        subject="Reset Your Password",
+        message=f"Your password reset code is: {code}. It will expire in 3 minutes",
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[to_email],
+        fail_silently=False,
+    )

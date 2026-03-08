@@ -10,7 +10,7 @@ from .models import User, UserProfile
 from .serializers import CustomTokenObtainPairSerializer, UserListSerializer, UserRegistrationSerializer, UserProfileSerializer, AdminUserDetailSerializer
 from rest_framework.permissions import IsAuthenticated 
 from rest_framework.parsers import MultiPartParser, FormParser
-from .tasks import send_verification_email
+from .tasks import send_verification_email, send_password_code
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -163,3 +163,65 @@ class UserDetailByIdView(RetrieveAPIView):
     serializer_class = AdminUserDetailSerializer
     permission_classes = [IsAdminUserCustom]
     lookup_field = "id"
+    
+class ForgotPasswordRequestView(APIView):
+    def post(self, request):
+        email = request.data.get("email")
+        if not email:
+            return Response({"error": "Email is required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        user = get_object_or_404(User, email=email)
+        
+        code = user.generate_verification_code()  # reuse existing method
+        send_password_code(user.email, code)  # reuse existing task
+        
+        return Response({"message": "Password reset code sent"}, status=status.HTTP_200_OK)
+
+
+class ForgotPasswordVerifyCodeView(APIView):
+    def post(self, request):
+        email = request.data.get("email")
+        code = request.data.get("code")
+
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return Response({"error": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if user.verification_code != code:
+            return Response({"error": "Invalid verification code."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if timezone.now() > user.code_expiry:
+            return Response({"error": "Verification code expired."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Clear code and mark as verified — but don't activate account here
+        user.verification_code = None
+        user.code_expiry = None
+        user.save()
+
+        # Issue a short-lived token to authorize the password reset step
+        refresh = RefreshToken.for_user(user)
+        return Response({
+            "message": "Code verified. You may now reset your password.",
+            "reset_token": str(refresh.access_token)
+        }, status=status.HTTP_200_OK)
+
+
+class ForgotPasswordResetView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        new_password = request.data.get("new_password")
+        confirm_password = request.data.get("confirm_password")
+
+        if not new_password or not confirm_password:
+            return Response({"error": "Both password fields are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if new_password != confirm_password:
+            return Response({"error": "Passwords do not match."}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = request.user
+        user.set_password(new_password)
+        user.save()
+
+        return Response({"message": "Password reset successfully."}, status=status.HTTP_200_OK)
