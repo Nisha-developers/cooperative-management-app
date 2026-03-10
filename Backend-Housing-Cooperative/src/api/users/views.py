@@ -1,4 +1,5 @@
 from rest_framework.generics import ListAPIView, RetrieveAPIView
+from rest_framework_simplejwt.views import TokenRefreshView
 from config.permissions import IsAdminUserCustom
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -83,14 +84,60 @@ class VerifyCodeView(APIView):
         user.code_expiry = None
         user.save()
         refresh = RefreshToken.for_user(user)
-        return Response({
+
+        response = Response({
             "message": "Email verified successfully.",
-            "access": str(refresh.access_token),
-            "refresh": str(refresh)
+            "access": str(refresh.access_token)
         }, status=200)
+
+        response.set_cookie(
+            key="refresh",
+            value=str(refresh),
+            httponly=True,
+            secure=False,
+            samesite="Lax",
+            max_age=60 * 60 * 24,
+        )
+
+        return response
         
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
+
+    def post(self, request, *args, **kwargs):
+        response = super().post(request, *args, **kwargs)
+
+        refresh = response.data.get("refresh")
+
+        if refresh:
+            response.set_cookie(
+                key="refresh",
+                value=refresh,
+                httponly=True,
+                secure=False,  # True in production (HTTPS)
+                samesite="Lax",
+                max_age=60 * 60 * 24,  # 1 day
+            )
+
+            # remove refresh token from response body
+            response.data.pop("refresh", None)
+
+        return response
+    
+class CookieTokenRefreshView(TokenRefreshView):
+
+    def post(self, request, *args, **kwargs):
+        refresh_token = request.COOKIES.get("refresh")
+
+        if not refresh_token:
+            return Response(
+                {"detail": "Refresh token not found in cookies"},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        request.data["refresh"] = refresh_token
+
+        return super().post(request, *args, **kwargs)
 
 class UserDetailView(APIView):
     permission_classes = [IsAuthenticated]
@@ -225,3 +272,11 @@ class ForgotPasswordResetView(APIView):
         user.save()
 
         return Response({"message": "Password reset successfully."}, status=status.HTTP_200_OK)
+
+class LogoutView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        response = Response({"message": "Logged out successfully"})
+        response.delete_cookie("refresh")
+        return response
