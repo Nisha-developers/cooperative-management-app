@@ -45,7 +45,8 @@ INSTALLED_APPS = [
     'api.wallet',
     'corsheaders',
     'drf_spectacular',
-    'django_filters'
+    'django_filters',
+    'rest_framework_simplejwt.token_blacklist'
 ]
 
 MIDDLEWARE = [
@@ -159,6 +160,8 @@ SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=20),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=3),
     "AUTH_HEADER_TYPES": ("Bearer",),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
 }
 
 CELERY_BROKER_URL = 'redis://redis:6379/0'

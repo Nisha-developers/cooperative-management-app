@@ -116,7 +116,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
                 httponly=True,
                 secure=False,  # True in production (HTTPS)
                 samesite="Lax",
-                max_age=60 * 60 * 24,  # 1 day
+                max_age=60 * 60 * 24 * 3,  # 1 day
             )
 
             # remove refresh token from response body
@@ -137,7 +137,25 @@ class CookieTokenRefreshView(TokenRefreshView):
 
         request.data["refresh"] = refresh_token
 
-        return super().post(request, *args, **kwargs)
+        response = super().post(request, *args, **kwargs)
+
+        # if refresh rotation is enabled
+        new_refresh = response.data.get("refresh")
+
+        if new_refresh:
+            response.set_cookie(
+                key="refresh",
+                value=new_refresh,
+                httponly=True,
+                secure=False,  # True in production
+                samesite="Lax",
+                max_age=60 * 60 * 24 * 3,  # match refresh lifetime
+            )
+
+            # remove refresh from response body
+            response.data.pop("refresh", None)
+
+        return response
 
 class UserDetailView(APIView):
     permission_classes = [IsAuthenticated]
