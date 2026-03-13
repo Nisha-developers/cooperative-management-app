@@ -179,4 +179,18 @@ DEFAULT_FROM_EMAIL = "Bethel Housing Cooperative <noreply@myapp.com>"
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
 ] #change later 
-CORS_ALLOW_CREDENTIAL = True
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_HEADERS = [
+    "accept",
+    "authorization",
+    "content-type",
+    "x-csrftoken",
+]
+CORS_ALLOW_METHODS = [
+    "GET",
+    "POST",
+    "PUT",
+    "PATCH",
+    "DELETE",
+    "OPTIONS",
+]
