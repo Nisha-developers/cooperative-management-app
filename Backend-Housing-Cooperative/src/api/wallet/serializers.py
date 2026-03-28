@@ -1,10 +1,27 @@
 from rest_framework import serializers
-from .models import Wallet, WalletTransaction
+
+from .models import (
+    Wallet,
+    WalletPaymentProof,
+    WalletTransaction,
+    WalletTransactionSource,
+    WalletTransactionType,
+)
+
+
+class WalletPaymentProofSerializer(serializers.ModelSerializer):
+    uploaded_by = serializers.StringRelatedField(read_only=True)
+
+    class Meta:
+        model = WalletPaymentProof
+        fields = ["uid", "image_url", "uploaded_by", "created_on", "updated_on"]
+        read_only_fields = ["uid", "uploaded_by", "created_on", "updated_on"]
 
 
 class WalletTransactionSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField(read_only=True)
     confirmed_by = serializers.StringRelatedField(read_only=True)
+    payment_proof = WalletPaymentProofSerializer(read_only=True)
 
     class Meta:
         model = WalletTransaction
@@ -14,7 +31,9 @@ class WalletTransactionSerializer(serializers.ModelSerializer):
             "source",
             "status",
             "amount",
+            "remark",
             "reference",
+            "payment_proof",
             "created_by",
             "confirmed_by",
             "confirmed_at",
@@ -25,11 +44,80 @@ class WalletTransactionSerializer(serializers.ModelSerializer):
             "uid",
             "reference",
             "status",
+            "payment_proof",
             "confirmed_by",
             "confirmed_at",
             "created_on",
             "updated_on",
         ]
+
+
+class CreditTransactionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WalletTransaction
+        fields = ["uid", "source", "amount", "remark", "reference", "status", "created_on"]
+        read_only_fields = ["uid", "reference", "status", "created_on"]
+
+    def validate_source(self, value):
+        allowed = {WalletTransactionSource.USER_TOPUP, WalletTransactionSource.TRANSFER}
+        if value not in allowed:
+            raise serializers.ValidationError(
+                f"Invalid source for a credit. Allowed: {', '.join(allowed)}"
+            )
+        return value
+
+    def create(self, validated_data):
+        validated_data["type"] = WalletTransactionType.CREDIT
+        validated_data["wallet"] = self.context["wallet"]
+        validated_data["created_by"] = self.context["request"].user
+        return super().create(validated_data)
+
+
+class DebitTransactionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WalletTransaction
+        fields = ["uid", "source", "amount", "remark", "reference", "status", "created_on"]
+        read_only_fields = ["uid", "reference", "status", "created_on"]
+
+    def validate_source(self, value):
+        allowed = {
+            WalletTransactionSource.WITHDRAWAL,
+            WalletTransactionSource.TRANSFER,
+            WalletTransactionSource.PURCHASE,
+        }
+        if value not in allowed:
+            raise serializers.ValidationError(
+                f"Invalid source for a debit. Allowed: {', '.join(allowed)}"
+            )
+        return value
+
+    def validate(self, attrs):
+        wallet = self.context["wallet"]
+        if wallet.balance < attrs.get("amount", 0):
+            raise serializers.ValidationError({"amount": "Insufficient wallet balance."})
+        return attrs
+
+    def create(self, validated_data):
+        validated_data["type"] = WalletTransactionType.DEBIT
+        validated_data["wallet"] = self.context["wallet"]
+        validated_data["created_by"] = self.context["request"].user
+        return super().create(validated_data)
+
+
+class TransactionReviewSerializer(serializers.Serializer):
+    remark = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class ClientProofUploadSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WalletPaymentProof
+        fields = ["image_url"]
+
+
+class AdminProofUploadSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WalletPaymentProof
+        fields = ["image_url"]
 
 
 class WalletSerializer(serializers.ModelSerializer):
@@ -38,30 +126,12 @@ class WalletSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Wallet
-        fields = [
-            "uid",
-            "user",
-            "balance",
-            "transactions",
-            "created_on",
-            "updated_on",
-        ]
-        read_only_fields = [
-            "uid",
-            "balance",
-            "created_on",
-            "updated_on",
-        ]
+        fields = ["uid", "user", "balance", "transactions", "created_on", "updated_on"]
+        read_only_fields = ["uid", "balance", "created_on", "updated_on"]
 
 
 class WalletSummarySerializer(serializers.ModelSerializer):
-
     class Meta:
         model = Wallet
-        fields = [
-            "uid",
-            "balance",
-            "created_on",
-            "updated_on",
-        ]
+        fields = ["uid", "balance", "created_on", "updated_on"]
         read_only_fields = fields

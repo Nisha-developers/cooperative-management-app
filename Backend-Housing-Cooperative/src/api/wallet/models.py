@@ -28,6 +28,7 @@ class WalletTransactionSource(models.TextChoices):
     ADMIN_ADJUSTMENT = "ADMIN_ADJUSTMENT", "Admin adjustment"
     WITHDRAWAL = "WITHDRAWAL", "Withdrawal"
     PURCHASE = "PURCHASE", "Purchase"
+    TRANSFER = "TRANSFER", "Transfer"
 
 
 class Wallet(models.Model):
@@ -39,7 +40,6 @@ class Wallet(models.Model):
         on_delete=models.CASCADE,
     )
 
-    # cached balance (fast reads)
     balance = models.DecimalField(
         max_digits=14,
         decimal_places=2,
@@ -80,6 +80,8 @@ class WalletTransaction(models.Model):
         validators=[MinValueValidator(Decimal("0.01"))],
     )
 
+    remark = models.TextField(blank=True, default="")
+
     reference = models.CharField(
         max_length=120,
         unique=True,
@@ -117,3 +119,33 @@ class WalletTransaction(models.Model):
 
     def __str__(self) -> str:
         return f"{self.reference} | {self.type} {self.amount} ({self.status})"
+
+
+class WalletPaymentProof(models.Model):
+    uid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+
+    transaction = models.OneToOneField(
+        WalletTransaction,
+        related_name="payment_proof",
+        on_delete=models.CASCADE,
+    )
+
+    # image = models.ImageField(upload_to="wallet/payment_proofs/%Y/%m/")
+    image_url = models.TextField(blank=True, default="")
+
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name="wallet_payment_proofs",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+
+    created_on = models.DateTimeField(auto_now_add=True)
+    updated_on = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "wallet_payment_proof"
+
+    def __str__(self) -> str:
+        return f"PaymentProof({self.transaction.reference})"
