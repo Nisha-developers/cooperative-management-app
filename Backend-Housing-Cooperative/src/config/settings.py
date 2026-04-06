@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'api.users',
+    'api.loan',
     'api.listings',
     'api.wallet',
     'corsheaders',

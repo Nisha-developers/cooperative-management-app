@@ -50,9 +50,9 @@ class Listing(models.Model):
     )
 
     # Rent-specific fields
-    rent_duration = models.CharField(
-        max_length=50, null=True, blank=True,
-        help_text="Duration of the rental agreement (e.g., 1 year)"
+    rent_duration = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text="Duration of the rental agreement in months"
     )
 
     # Property details (land won't use bedrooms/bathrooms etc.)

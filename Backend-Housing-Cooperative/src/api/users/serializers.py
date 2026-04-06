@@ -4,7 +4,38 @@ from api.wallet.serializers import WalletSummarySerializer
 from rest_framework import serializers
 from django.core.exceptions import ObjectDoesNotExist
 from .models import  User, UserProfile
+from django.utils import timezone
 
+LOAN_MIN_BALANCE = 500_000
+LOAN_MIN_MEMBERSHIP_MONTHS = 6
+
+def get_loan_eligibility(user):
+    """Returns eligibility dict for a user."""
+    try:
+        wallet = user.wallet
+        balance = wallet.balance
+    except ObjectDoesNotExist:
+        balance = 0
+
+    has_enough_balance = balance >= LOAN_MIN_BALANCE
+
+    joined_at = user.created_at
+    months_since_joined = (timezone.now() - joined_at).days // 30
+    has_tenure = months_since_joined >= LOAN_MIN_MEMBERSHIP_MONTHS
+
+    is_eligible = has_enough_balance or has_tenure
+    max_loan_amount = balance * 2 if is_eligible else 0
+
+    return {
+        "is_eligible": is_eligible,
+        "reason": (
+            "Eligible based on balance and/or tenure"
+            if is_eligible
+            else "Minimum 6 months membership or ₦500,000 balance required"
+        ),
+        "max_loan_amount": str(max_loan_amount),
+        "months_since_joined": months_since_joined,
+    }
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
     class Meta:
@@ -55,7 +86,8 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
                 "is_admin": user.is_admin,
                 "membership_id": user.membership_id
             },
-            "wallet": wallet_data
+            "wallet": wallet_data,
+            "loan_eligibility": get_loan_eligibility(user)
         })
 
         return data

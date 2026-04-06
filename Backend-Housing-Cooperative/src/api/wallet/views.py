@@ -2,7 +2,8 @@ from django.db import transaction as db_transaction
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.exceptions import NotFound, ValidationError
-from rest_framework.permissions import IsAdminUser, IsAuthenticated
+from rest_framework.permissions import IsAuthenticated
+from config.permissions import IsAdminUserCustom
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -206,7 +207,7 @@ class AdminPendingTransactionListView(APIView):
 
     Lists all PENDING transactions. Optional: ?type=CREDIT | DEBIT
     """
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsAdminUserCustom]
 
     def get(self, request):
         qs = WalletTransaction.objects.filter(
@@ -228,7 +229,7 @@ class AdminApproveTransactionView(APIView):
     DEBIT  approved → balance -= amount (re-checks funds)
     DEBIT + TRANSFER requires proof uploaded first via /admin/.../proof/
     """
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsAdminUserCustom]
 
     def post(self, request, uid):
         review_serializer = TransactionReviewSerializer(data=request.data)
@@ -282,7 +283,7 @@ class AdminRejectTransactionView(APIView):
     Body (optional): { "remark": "Proof did not match" }
     Sets status to REJECTED. Balance is never touched.
     """
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsAdminUserCustom]
 
     def post(self, request, uid):
         review_serializer = TransactionReviewSerializer(data=request.data)
@@ -317,7 +318,7 @@ class AdminProofUploadView(APIView):
     Admin attaches proof to a PENDING DEBIT + TRANSFER transaction before approval.
     Body: { "image_url": "https://..." }
     """
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsAdminUserCustom]
 
     def post(self, request, uid):
         tx = _get_transaction_or_404(uid)

@@ -8,7 +8,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from api.wallet.serializers import WalletSummarySerializer
 from rest_framework import status, permissions
 from .models import User, UserProfile
-from .serializers import CustomTokenObtainPairSerializer, UserListSerializer, UserRegistrationSerializer, UserProfileSerializer, AdminUserDetailSerializer
+from .serializers import CustomTokenObtainPairSerializer, UserListSerializer, UserRegistrationSerializer, UserProfileSerializer, AdminUserDetailSerializer, get_loan_eligibility
 from rest_framework.permissions import IsAuthenticated 
 from rest_framework.parsers import MultiPartParser, FormParser
 from .tasks import send_verification_email, send_password_code
@@ -179,7 +179,8 @@ class UserDetailView(APIView):
                 "is_admin": user.is_admin,
                 "membership_id": user.membership_id
             },
-            "wallet": wallet_data
+            "wallet": wallet_data,
+            "loan_eligibility": get_loan_eligibility(user),
         }, status=status.HTTP_200_OK)
 
 class UserProfileView(APIView):

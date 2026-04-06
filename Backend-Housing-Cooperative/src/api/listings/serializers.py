@@ -45,7 +45,7 @@ class ListingSerializer(serializers.ModelSerializer):
         # Rent duration required for rental listings
         if listing_type == ListingType.RENT and not data.get("rent_duration"):
             raise serializers.ValidationError(
-                {"rent_duration": "Rent duration is required for rental listings (e.g. 'per year')."}
+                {"rent_duration": "Rent duration is required for rental listings (in months)."}
             )
 
         return data
