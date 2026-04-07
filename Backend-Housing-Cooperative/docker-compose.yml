@@ -1,56 +1,54 @@
 services:
- web:
+  web:
     build: .
     container_name: cooperative
     ports:
       - 8000:8000
     volumes:
-      - ./src:/app  
+      - ./src:/app
     depends_on:
       db:
-        condition: service_healthy 
+        condition: service_healthy
         restart: true
     env_file:
       - .env
- db:
-  image: postgres:17
-  container_name: cooperative_postgres_db
-  volumes:
-    - postgres_db:/var/lib/postgresql/data
-  environment:
-    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    POSTGRES_DB: ${POSTGRES_DB}
-    POSTGRES_USER: ${POSTGRES_USER}
-  healthcheck:
-    test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-    interval: 10s
-    retries: 5
-    start_period: 30s
-    timeout: 10s
- redis:
-    image: redis:7
-    container_name: cooperative_redis_cache
-    ports:
-      - 6379:6379
-    restart: always
- celery:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: cooperative_celery
-    command: celery -A config worker --loglevel=info
+
+  db:
+    image: postgres:17
+    container_name: cooperative_postgres_db
+    volumes:
+      - postgres_db:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+      timeout: 10s
+
+  qcluster:
+    build: .
+    container_name: cooperative_qcluster
+    command: python manage.py qcluster
     volumes:
       - ./src:/app
     depends_on:
-      - redis
-      - web
-      - mail
+      db:
+        condition: service_healthy
+      web:
+        condition: service_started
     env_file:
       - .env
- mail:
+    restart: always
+
+  mail:
     image: mailhog/mailhog
     container_name: cooperative_mail
     ports:
       - 8025:8025
+
 volumes:
   postgres_db:

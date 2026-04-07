@@ -12,7 +12,6 @@ from .models import Loan, LoanRepaymentSchedule, LoanStatus, MONTHLY_INTEREST_RA
 
 
 def generate_repayment_schedule(loan: Loan):
-    """Create LoanRepaymentSchedule rows starting from next month."""
     start_date = date.today() + relativedelta(months=1)
     schedules = []
     for i in range(1, loan.tenure_months + 1):
@@ -26,21 +25,11 @@ def generate_repayment_schedule(loan: Loan):
 
 
 def disburse_loan(loan: Loan, admin_user):
-    """
-    Approve + disburse:
-    1. Compute totals
-    2. Credit user wallet (LOAN_DISBURSEMENT)
-    3. Generate schedule
-    4. Mark loan ACTIVE
-    """
-    from api.wallet.models import Wallet
-
     summary = Loan.calculate_summary(loan.principal, loan.tenure_months)
 
     with db_transaction.atomic():
         wallet = Wallet.objects.select_for_update().get(user=loan.user)
 
-        # Credit wallet
         WalletTransaction.objects.create(
             wallet=wallet,
             type=WalletTransactionType.CREDIT,
@@ -55,7 +44,6 @@ def disburse_loan(loan: Loan, admin_user):
         wallet.balance += loan.principal
         wallet.save(update_fields=["balance", "updated_on"])
 
-        # Update loan
         loan.total_repayable = summary["total_repayable"]
         loan.monthly_installment = summary["monthly_installment"]
         loan.status = LoanStatus.ACTIVE
@@ -68,22 +56,19 @@ def disburse_loan(loan: Loan, admin_user):
 
 
 def process_repayment(schedule: LoanRepaymentSchedule):
-    """
-    Called by a scheduled task (e.g. Celery beat) on or after each due_date.
-    - Deducts from wallet if balance is sufficient
-    - If not, marks as rolled over and adds 0.5% penalty to next installment
-    - If it's the last installment and still unpaid → DEFAULTED
-    """
     if schedule.is_paid:
         return
 
+    if schedule.wallet_transaction_id:
+        return
+    
     loan = schedule.loan
-    wallet = Wallet.objects.select_for_update().get(user=loan.user)
-    amount_owed = schedule.total_amount_due
 
     with db_transaction.atomic():
+        wallet = Wallet.objects.select_for_update().get(user=loan.user)
+        amount_owed = schedule.total_amount_due
+
         if wallet.balance >= amount_owed:
-            # Deduct
             tx = WalletTransaction.objects.create(
                 wallet=wallet,
                 type=WalletTransactionType.DEBIT,
@@ -102,19 +87,19 @@ def process_repayment(schedule: LoanRepaymentSchedule):
             schedule.wallet_transaction = tx
             schedule.save()
 
-            # Check if all paid → complete the loan
+            # Mark loan completed if all installments paid
             if not loan.schedule.filter(is_paid=False).exists():
                 loan.status = LoanStatus.COMPLETED
                 loan.save(update_fields=["status", "updated_at"])
 
         else:
-            # Rollover: add 0.5% penalty on the outstanding amount
+            # Insufficient balance — rollover with penalty
             penalty = (amount_owed * MONTHLY_INTEREST_RATE).quantize(Decimal("0.01"))
             schedule.is_rolled_over = True
             schedule.extra_interest += penalty
             schedule.save(update_fields=["is_rolled_over", "extra_interest", "updated_at"])
 
-            # If this was the last installment, mark loan as defaulted
+            # Last installment still unpaid → default
             if schedule.installment_number == loan.tenure_months:
                 loan.status = LoanStatus.DEFAULTED
                 loan.save(update_fields=["status", "updated_at"])

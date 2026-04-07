@@ -1,15 +1,17 @@
 from decimal import Decimal
-from rest_framework.views import APIView
-from rest_framework.response import Response
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
-from django.shortcuts import get_object_or_404
+from rest_framework.response import Response
+from rest_framework.views import APIView
 from config.permissions import IsAdminUserCustom
 
 from .models import Loan, LoanStatus
 from .serializers import (
     LoanPreviewSerializer, LoanApplicationSerializer,
     LoanDetailSerializer, LoanListSerializer, AdminLoanDetailSerializer,
+    check_loan_eligibility,
 )
 from .services import disburse_loan
 
@@ -17,7 +19,7 @@ from .services import disburse_loan
 class LoanPreviewView(APIView):
     """
     POST /loans/preview/
-    No loan is created. Returns full repayment breakdown before applying.
+    Returns repayment breakdown without creating a loan.
     Body: { "principal": 200000, "tenure_months": 6 }
     """
     permission_classes = [IsAuthenticated]
@@ -29,16 +31,13 @@ class LoanPreviewView(APIView):
         principal = serializer.validated_data["principal"]
         tenure_months = serializer.validated_data["tenure_months"]
 
-        # Eligibility check
-        try:
-            wallet = request.user.wallet
-        except Exception:
-            return Response({"error": "No wallet found."}, status=status.HTTP_400_BAD_REQUEST)
+        is_eligible, reason, max_loan_amount = check_loan_eligibility(request.user)
+        if not is_eligible:
+            return Response({"error": reason}, status=status.HTTP_403_FORBIDDEN)
 
-        max_allowed = wallet.balance * 2
-        if principal > max_allowed:
+        if principal > max_loan_amount:
             return Response(
-                {"error": f"Maximum loan amount is ₦{max_allowed:,.2f} (2× your balance)."},
+                {"error": f"Maximum loan amount is ₦{max_loan_amount:,.2f} (2× your balance)."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -47,21 +46,20 @@ class LoanPreviewView(APIView):
 
 
 class LoanApplyView(APIView):
-    """
-    POST /loans/apply/
-    Creates a PENDING loan for admin review.
-    """
+    """POST /loans/apply/"""
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        serializer = LoanApplicationSerializer(data=request.data, context={"request": request})
+        serializer = LoanApplicationSerializer(
+            data=request.data, context={"request": request}
+        )
         serializer.is_valid(raise_exception=True)
         loan = serializer.save(user=request.user)
         return Response(LoanDetailSerializer(loan).data, status=status.HTTP_201_CREATED)
 
 
 class UserLoanListView(APIView):
-    """GET /loans/ — current user's loan history"""
+    """GET /loans/"""
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -70,15 +68,13 @@ class UserLoanListView(APIView):
 
 
 class UserLoanDetailView(APIView):
-    """GET /loans/<uid>/ — loan detail + schedule"""
+    """GET /loans/<uid>/"""
     permission_classes = [IsAuthenticated]
 
     def get(self, request, uid):
         loan = get_object_or_404(Loan, uid=uid, user=request.user)
         return Response(LoanDetailSerializer(loan).data)
 
-
-# ── Admin ──────────────────────────────────────────────────────────────────
 
 class AdminLoanListView(APIView):
     """GET /admin/loans/?status=PENDING"""
@@ -102,10 +98,7 @@ class AdminLoanDetailView(APIView):
 
 
 class AdminApproveLoanView(APIView):
-    """
-    POST /admin/loans/<uid>/approve/
-    Disburses principal to wallet and generates repayment schedule.
-    """
+    """POST /admin/loans/<uid>/approve/"""
     permission_classes = [IsAdminUserCustom]
 
     def post(self, request, uid):
@@ -137,6 +130,6 @@ class AdminRejectLoanView(APIView):
         loan.status = LoanStatus.REJECTED
         loan.remark = request.data.get("remark", "")
         loan.approved_by = request.user
-        loan.approved_at = __import__("django.utils.timezone", fromlist=["timezone"]).timezone.now()
+        loan.approved_at = timezone.now()
         loan.save()
         return Response(AdminLoanDetailSerializer(loan).data, status=status.HTTP_200_OK)

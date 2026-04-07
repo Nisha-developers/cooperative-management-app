@@ -6,14 +6,14 @@ from django.utils import timezone
 
 
 class LoanStatus(models.TextChoices):
-    PENDING = "PENDING", "Pending"         # applied, awaiting admin approval
-    ACTIVE = "ACTIVE", "Active"            # disbursed, repayments ongoing
-    COMPLETED = "COMPLETED", "Completed"   # fully paid off
-    REJECTED = "REJECTED", "Rejected"      # admin rejected
-    DEFAULTED = "DEFAULTED", "Defaulted"   # missed all payments
+    PENDING = "PENDING", "Pending"
+    ACTIVE = "ACTIVE", "Active"
+    COMPLETED = "COMPLETED", "Completed"
+    REJECTED = "REJECTED", "Rejected"
+    DEFAULTED = "DEFAULTED", "Defaulted"
 
 
-MONTHLY_INTEREST_RATE = Decimal("0.005")  # 0.5% per month
+MONTHLY_INTEREST_RATE = Decimal("0.005")
 MAX_TENURE_MONTHS = 11
 
 
@@ -27,18 +27,25 @@ class Loan(models.Model):
     )
 
     principal = models.DecimalField(max_digits=14, decimal_places=2)
-    tenure_months = models.PositiveIntegerField(help_text="Repayment period in months (max 11)")
+    tenure_months = models.PositiveIntegerField(
+        help_text="Repayment period in months (max 11)"
+    )
     interest_rate = models.DecimalField(
         max_digits=6, decimal_places=4,
         default=MONTHLY_INTEREST_RATE,
         help_text="Monthly interest rate at time of application"
     )
 
-    # Computed at approval time
-    total_repayable = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
-    monthly_installment = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    total_repayable = models.DecimalField(
+        max_digits=14, decimal_places=2, null=True, blank=True
+    )
+    monthly_installment = models.DecimalField(
+        max_digits=14, decimal_places=2, null=True, blank=True
+    )
 
-    status = models.CharField(max_length=20, choices=LoanStatus.choices, default=LoanStatus.PENDING)
+    status = models.CharField(
+        max_length=20, choices=LoanStatus.choices, default=LoanStatus.PENDING
+    )
 
     approved_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -48,7 +55,6 @@ class Loan(models.Model):
     )
     approved_at = models.DateTimeField(null=True, blank=True)
     disbursed_at = models.DateTimeField(null=True, blank=True)
-
     remark = models.TextField(blank=True, default="")
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -62,7 +68,6 @@ class Loan(models.Model):
 
     @staticmethod
     def calculate_summary(principal: Decimal, tenure_months: int) -> dict:
-        """Pure calculation — used for preview endpoint and on approval."""
         rate = MONTHLY_INTEREST_RATE
         total_interest = principal * rate * tenure_months
         total_repayable = principal + total_interest
@@ -78,18 +83,21 @@ class Loan(models.Model):
 
 
 class LoanRepaymentSchedule(models.Model):
-    """One row per month — generated when loan is approved/disbursed."""
     uid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
 
     loan = models.ForeignKey(Loan, related_name="schedule", on_delete=models.CASCADE)
 
-    installment_number = models.PositiveIntegerField()   # 1, 2, ... tenure_months
+    installment_number = models.PositiveIntegerField()
     due_date = models.DateField()
     amount_due = models.DecimalField(max_digits=14, decimal_places=2)
-    amount_paid = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
+    amount_paid = models.DecimalField(
+        max_digits=14, decimal_places=2, default=Decimal("0.00")
+    )
 
     is_paid = models.BooleanField(default=False)
-    is_rolled_over = models.BooleanField(default=False, help_text="True if wallet had insufficient funds")
+    is_rolled_over = models.BooleanField(
+        default=False, help_text="True if wallet had insufficient funds on due date"
+    )
     extra_interest = models.DecimalField(
         max_digits=14, decimal_places=2, default=Decimal("0.00"),
         help_text="Accumulated penalty interest from rollovers"
@@ -112,7 +120,6 @@ class LoanRepaymentSchedule(models.Model):
 
     @property
     def total_amount_due(self):
-        """Base due + any rolled-over penalty interest."""
         return self.amount_due + self.extra_interest
 
     def __str__(self):
