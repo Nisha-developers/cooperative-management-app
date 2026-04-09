@@ -7,6 +7,7 @@ urlpatterns = [
     path("apply/", views.LoanApplyView.as_view()),
     path("", views.UserLoanListView.as_view()),
     path("<uuid:uid>/", views.UserLoanDetailView.as_view()),
+    path("<uuid:uid>/repay/", views.LoanRepayView.as_view()),
 
     # Admin
     path("admin/", views.AdminLoanListView.as_view()),

@@ -7,13 +7,13 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from config.permissions import IsAdminUserCustom
 
-from .models import Loan, LoanStatus
+from .models import Loan, LoanRepaymentSchedule, LoanStatus
 from .serializers import (
     LoanPreviewSerializer, LoanApplicationSerializer,
     LoanDetailSerializer, LoanListSerializer, AdminLoanDetailSerializer,
     check_loan_eligibility,
 )
-from .services import disburse_loan
+from .services import disburse_loan, process_repayment
 
 
 class LoanPreviewView(APIView):
@@ -74,6 +74,88 @@ class UserLoanDetailView(APIView):
     def get(self, request, uid):
         loan = get_object_or_404(Loan, uid=uid, user=request.user)
         return Response(LoanDetailSerializer(loan).data)
+
+
+class LoanRepayView(APIView):
+    """
+    POST /loans/<uid>/repay/
+
+    Immediately deducts the current month's installment from the user's
+    wallet — no need to wait for the end-of-month scheduler.
+
+    The scheduler will skip any installment already marked is_paid=True,
+    so early payment is fully safe and idempotent.
+
+    Optional body: { "installment_number": 3 }
+    If omitted, defaults to the earliest unpaid installment due this month
+    (falling back to the next upcoming unpaid installment).
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, uid):
+        loan = get_object_or_404(Loan, uid=uid, user=request.user)
+
+        if loan.status != LoanStatus.ACTIVE:
+            return Response(
+                {"error": f"Only ACTIVE loans can be repaid. Current status: {loan.status}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        installment_number = request.data.get("installment_number")
+
+        if installment_number is not None:
+            # User explicitly chose an installment
+            try:
+                installment_number = int(installment_number)
+            except (TypeError, ValueError):
+                return Response(
+                    {"error": "installment_number must be an integer."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            schedule = get_object_or_404(
+                LoanRepaymentSchedule,
+                loan=loan,
+                installment_number=installment_number,
+            )
+        else:
+            # Auto-select: earliest unpaid installment due this month,
+            # or next upcoming unpaid installment if none due this month.
+            from django.utils import timezone
+            today = timezone.now().date()
+            schedule = (
+                loan.schedule
+                .filter(is_paid=False, due_date__year=today.year, due_date__month=today.month)
+                .order_by("installment_number")
+                .first()
+                or loan.schedule
+                .filter(is_paid=False)
+                .order_by("installment_number")
+                .first()
+            )
+            if not schedule:
+                return Response(
+                    {"error": "No outstanding installments found. Your loan may already be fully paid."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        result = process_repayment(schedule)
+
+        # Map internal status to HTTP status
+        if result["status"] == "already_paid":
+            return Response(result, status=status.HTTP_200_OK)
+
+        if result["status"] == "insufficient_funds":
+            return Response(result, status=status.HTTP_402_PAYMENT_REQUIRED)
+
+        # success — return updated loan detail so the client state is fresh
+        loan.refresh_from_db()
+        return Response(
+            {
+                **result,
+                "loan": LoanDetailSerializer(loan).data,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class AdminLoanListView(APIView):

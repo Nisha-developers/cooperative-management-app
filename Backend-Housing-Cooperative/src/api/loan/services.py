@@ -56,12 +56,16 @@ def disburse_loan(loan: Loan, admin_user):
 
 
 def process_repayment(schedule: LoanRepaymentSchedule):
+    """
+    Core repayment logic — used by both the scheduler and the manual repay endpoint.
+    Returns a result dict so callers can surface feedback to the user.
+    """
     if schedule.is_paid:
-        return
+        return {"status": "already_paid", "message": "This installment is already paid."}
 
     if schedule.wallet_transaction_id:
-        return
-    
+        return {"status": "already_paid", "message": "This installment is already paid."}
+
     loan = schedule.loan
 
     with db_transaction.atomic():
@@ -91,6 +95,19 @@ def process_repayment(schedule: LoanRepaymentSchedule):
             if not loan.schedule.filter(is_paid=False).exists():
                 loan.status = LoanStatus.COMPLETED
                 loan.save(update_fields=["status", "updated_at"])
+                return {
+                    "status": "success",
+                    "message": "Installment paid. Loan fully repaid — congratulations!",
+                    "amount_deducted": str(amount_owed),
+                    "loan_completed": True,
+                }
+
+            return {
+                "status": "success",
+                "message": f"Installment {schedule.installment_number} paid successfully.",
+                "amount_deducted": str(amount_owed),
+                "loan_completed": False,
+            }
 
         else:
             # Insufficient balance — rollover with penalty
@@ -103,3 +120,47 @@ def process_repayment(schedule: LoanRepaymentSchedule):
             if schedule.installment_number == loan.tenure_months:
                 loan.status = LoanStatus.DEFAULTED
                 loan.save(update_fields=["status", "updated_at"])
+
+            return {
+                "status": "insufficient_funds",
+                "message": (
+                    f"Insufficient wallet balance. ₦{amount_owed:,.2f} required, "
+                    f"₦{wallet.balance:,.2f} available. "
+                    f"A penalty of ₦{penalty:,.2f} has been added."
+                ),
+                "amount_required": str(amount_owed),
+                "wallet_balance": str(wallet.balance),
+                "penalty_added": str(penalty),
+            }
+
+
+def get_loan_balance_summary(loan: Loan) -> dict:
+    """
+    Returns total outstanding balance and this month's due amount for a loan.
+    'This month' means the earliest unpaid installment whose due_date falls
+    in the current calendar month, or the next upcoming unpaid installment
+    if none falls this month.
+    """
+    today = timezone.now().date()
+    unpaid = loan.schedule.filter(is_paid=False).order_by("installment_number")
+
+    # Total outstanding = sum of total_amount_due across all unpaid installments
+    total_outstanding = sum(s.total_amount_due for s in unpaid)
+
+    # This month's installment: earliest unpaid due this month, else next upcoming
+    this_month_schedule = (
+        unpaid.filter(due_date__year=today.year, due_date__month=today.month).first()
+        or unpaid.first()
+    )
+
+    this_month_due = this_month_schedule.total_amount_due if this_month_schedule else Decimal("0.00")
+    this_month_due_date = this_month_schedule.due_date if this_month_schedule else None
+    this_month_installment_number = this_month_schedule.installment_number if this_month_schedule else None
+
+    return {
+        "total_outstanding": total_outstanding.quantize(Decimal("0.01")),
+        "this_month_due": this_month_due.quantize(Decimal("0.01")),
+        "this_month_due_date": this_month_due_date,
+        "this_month_installment_number": this_month_installment_number,
+        "installments_remaining": unpaid.count(),
+    }

@@ -29,7 +29,8 @@ class WalletTransactionSource(models.TextChoices):
     WITHDRAWAL = "WITHDRAWAL", "Withdrawal"
     PURCHASE = "PURCHASE", "Purchase"
     TRANSFER = "TRANSFER", "Transfer"
-    LOAN_REPAYMENT = "LOAN_REPAYMENT", "Loan repayment" 
+    LOAN_REPAYMENT = "LOAN_REPAYMENT", "Loan repayment"
+    LOAN_DISBURSEMENT = "LOAN_DISBURSEMENT", "Loan Disbursement"
 
 
 class Wallet(models.Model):

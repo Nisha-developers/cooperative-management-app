@@ -88,16 +88,35 @@ class RepaymentScheduleSerializer(serializers.ModelSerializer):
         ]
 
 
+class LoanBalanceSummarySerializer(serializers.Serializer):
+    """Embedded in LoanDetailSerializer — shows what the user owes right now."""
+    total_outstanding = serializers.DecimalField(max_digits=14, decimal_places=2)
+    this_month_due = serializers.DecimalField(max_digits=14, decimal_places=2)
+    this_month_due_date = serializers.DateField(allow_null=True)
+    this_month_installment_number = serializers.IntegerField(allow_null=True)
+    installments_remaining = serializers.IntegerField()
+
+
 class LoanDetailSerializer(serializers.ModelSerializer):
     schedule = RepaymentScheduleSerializer(many=True, read_only=True)
+    balance_summary = serializers.SerializerMethodField()
 
     class Meta:
         model = Loan
         fields = [
             "uid", "principal", "tenure_months", "interest_rate",
             "total_repayable", "monthly_installment", "status",
-            "approved_at", "disbursed_at", "remark", "created_at", "schedule",
+            "approved_at", "disbursed_at", "remark", "created_at",
+            "balance_summary",
+            "schedule",
         ]
+
+    def get_balance_summary(self, obj):
+        if obj.status != "ACTIVE":
+            return None
+        from .services import get_loan_balance_summary
+        data = get_loan_balance_summary(obj)
+        return LoanBalanceSummarySerializer(data).data
 
 
 class LoanListSerializer(serializers.ModelSerializer):
@@ -114,6 +133,7 @@ class AdminLoanDetailSerializer(serializers.ModelSerializer):
     schedule = RepaymentScheduleSerializer(many=True, read_only=True)
     user_email = serializers.EmailField(source="user.email", read_only=True)
     user_membership = serializers.CharField(source="user.membership_id", read_only=True)
+    balance_summary = serializers.SerializerMethodField()
 
     class Meta:
         model = Loan
@@ -121,5 +141,14 @@ class AdminLoanDetailSerializer(serializers.ModelSerializer):
             "uid", "user_email", "user_membership",
             "principal", "tenure_months", "interest_rate",
             "total_repayable", "monthly_installment", "status",
-            "remark", "approved_at", "disbursed_at", "created_at", "schedule",
+            "remark", "approved_at", "disbursed_at", "created_at",
+            "balance_summary",
+            "schedule",
         ]
+
+    def get_balance_summary(self, obj):
+        if obj.status != "ACTIVE":
+            return None
+        from .services import get_loan_balance_summary
+        data = get_loan_balance_summary(obj)
+        return LoanBalanceSummarySerializer(data).data

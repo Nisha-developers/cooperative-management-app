@@ -8,15 +8,18 @@ from django.core.exceptions import ObjectDoesNotExist
 from api.wallet.serializers import WalletSummarySerializer
 from rest_framework import status, permissions
 from .models import User, UserProfile
-from .serializers import CustomTokenObtainPairSerializer, UserListSerializer, UserRegistrationSerializer, UserProfileSerializer, AdminUserDetailSerializer, get_loan_eligibility
-from rest_framework.permissions import IsAuthenticated 
+from .serializers import (
+    CustomTokenObtainPairSerializer, UserListSerializer,
+    UserRegistrationSerializer, UserProfileSerializer,
+    AdminUserDetailSerializer, get_loan_eligibility, get_active_loan_summary,
+)
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
 from .tasks import send_verification_email, send_password_code
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
-from .models import User
 from rest_framework.pagination import PageNumberPagination
 
 
@@ -55,15 +58,14 @@ class ResendVerificationCodeView(APIView):
             return Response({"error": "Email is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         user = get_object_or_404(User, email=email)
-
         code = user.generate_verification_code()
-
         send_verification_email(user.email, code)
 
         return Response({"message": "Verification code resent"}, status=status.HTTP_200_OK)
-    
+
+
 class VerifyCodeView(APIView):
-     def post(self, request):
+    def post(self, request):
         email = request.data.get('email')
         code = request.data.get('code')
 
@@ -100,7 +102,8 @@ class VerifyCodeView(APIView):
         )
 
         return response
-        
+
+
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
 
@@ -114,16 +117,15 @@ class CustomTokenObtainPairView(TokenObtainPairView):
                 key="refresh",
                 value=refresh,
                 httponly=True,
-                secure=False,  # True in production (HTTPS)
+                secure=False,
                 samesite="Lax",
-                max_age=60 * 60 * 24 * 3,  # 1 day
+                max_age=60 * 60 * 24 * 3,
             )
-
-            # remove refresh token from response body
             response.data.pop("refresh", None)
 
         return response
-    
+
+
 class CookieTokenRefreshView(TokenRefreshView):
 
     def post(self, request, *args, **kwargs):
@@ -136,10 +138,8 @@ class CookieTokenRefreshView(TokenRefreshView):
             )
 
         request.data["refresh"] = refresh_token
-
         response = super().post(request, *args, **kwargs)
 
-        # if refresh rotation is enabled
         new_refresh = response.data.get("refresh")
 
         if new_refresh:
@@ -147,15 +147,14 @@ class CookieTokenRefreshView(TokenRefreshView):
                 key="refresh",
                 value=new_refresh,
                 httponly=True,
-                secure=False,  # True in production
+                secure=False,
                 samesite="Lax",
-                max_age=60 * 60 * 24 * 3,  # match refresh lifetime
+                max_age=60 * 60 * 24 * 3,
             )
-
-            # remove refresh from response body
             response.data.pop("refresh", None)
 
         return response
+
 
 class UserDetailView(APIView):
     permission_classes = [IsAuthenticated]
@@ -177,11 +176,13 @@ class UserDetailView(APIView):
                 "username": user.username,
                 "full_name": user.full_name,
                 "is_admin": user.is_admin,
-                "membership_id": user.membership_id
+                "membership_id": user.membership_id,
             },
             "wallet": wallet_data,
             "loan_eligibility": get_loan_eligibility(user),
+            "active_loan": get_active_loan_summary(user),  # null if no active loan
         }, status=status.HTTP_200_OK)
+
 
 class UserProfileView(APIView):
     permission_classes = [IsAuthenticated]
@@ -216,31 +217,33 @@ class UserProfileView(APIView):
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
 class UserListView(ListAPIView):
     serializer_class = UserListSerializer
     permission_classes = [IsAdminUserCustom]
     pagination_class = StandardResultsSetPagination
-    
+
     def get_queryset(self):
         return User.objects.filter(is_admin=False).order_by("-id")
+
 
 class UserDetailByIdView(RetrieveAPIView):
     queryset = User.objects.all()
     serializer_class = AdminUserDetailSerializer
     permission_classes = [IsAdminUserCustom]
     lookup_field = "id"
-    
+
+
 class ForgotPasswordRequestView(APIView):
     def post(self, request):
         email = request.data.get("email")
         if not email:
             return Response({"error": "Email is required"}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         user = get_object_or_404(User, email=email)
-        
-        code = user.generate_verification_code()  # reuse existing method
-        send_password_code(user.email, code)  # reuse existing task
-        
+        code = user.generate_verification_code()
+        send_password_code(user.email, code)
+
         return Response({"message": "Password reset code sent"}, status=status.HTTP_200_OK)
 
 
@@ -260,12 +263,10 @@ class ForgotPasswordVerifyCodeView(APIView):
         if timezone.now() > user.code_expiry:
             return Response({"error": "Verification code expired."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Clear code and mark as verified — but don't activate account here
         user.verification_code = None
         user.code_expiry = None
         user.save()
 
-        # Issue a short-lived token to authorize the password reset step
         refresh = RefreshToken.for_user(user)
         return Response({
             "message": "Code verified. You may now reset your password.",
@@ -291,6 +292,7 @@ class ForgotPasswordResetView(APIView):
         user.save()
 
         return Response({"message": "Password reset successfully."}, status=status.HTTP_200_OK)
+
 
 class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
