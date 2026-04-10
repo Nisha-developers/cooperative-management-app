@@ -123,6 +123,10 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
         return data
 
+class UserProfileInlineSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserProfile
+        fields = ['phone_number', 'account_number', 'account_name', 'bank_name', 'address', 'updated_at']
 
 class UserProfileSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(source='user.email', read_only=True)
@@ -149,30 +153,42 @@ class UserListSerializer(serializers.ModelSerializer):
 
 class AdminUserDetailSerializer(serializers.ModelSerializer):
     wallet = serializers.SerializerMethodField()
+    profile = serializers.SerializerMethodField()
+    loan_eligibility = serializers.SerializerMethodField()
+    active_loan = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = [
-            "id",
-            "email",
-            "username",
-            "full_name",
-            "is_admin",
-            "membership_id",
-            "wallet",
+            "id", "email", "username", "full_name",
+            "is_admin", "membership_id", "wallet",
+            "profile", "loan_eligibility", "active_loan",
         ]
 
     def get_wallet(self, obj):
         try:
-            wallet = obj.wallet
-            return WalletSummarySerializer(wallet).data
+            return WalletSummarySerializer(obj.wallet).data
         except ObjectDoesNotExist:
             return None
+
+    def get_profile(self, obj):
+        profile, _ = UserProfile.objects.get_or_create(user=obj)
+        return UserProfileInlineSerializer(profile).data
+
+    def get_loan_eligibility(self, obj):
+        return get_loan_eligibility(obj)
+
+    def get_active_loan(self, obj):
+        return get_active_loan_summary(obj)
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
         wallet_data = representation.pop("wallet")
+        profile_data = representation.pop("profile")
         return {
             "user": representation,
             "wallet": wallet_data,
+            "profile": profile_data,
+            "loan_eligibility": representation.pop("loan_eligibility"),
+            "active_loan": representation.pop("active_loan"),
         }

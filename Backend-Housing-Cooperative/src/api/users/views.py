@@ -12,6 +12,7 @@ from .serializers import (
     CustomTokenObtainPairSerializer, UserListSerializer,
     UserRegistrationSerializer, UserProfileSerializer,
     AdminUserDetailSerializer, get_loan_eligibility, get_active_loan_summary,
+    UserProfileInlineSerializer
 )
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
@@ -168,6 +169,8 @@ class UserDetailView(APIView):
             wallet = None
 
         wallet_data = WalletSummarySerializer(wallet).data if wallet else None
+        profile, _ = UserProfile.objects.get_or_create(user=user)
+        profile_data = UserProfileInlineSerializer(profile).data
 
         return Response({
             "user": {
@@ -178,6 +181,7 @@ class UserDetailView(APIView):
                 "is_admin": user.is_admin,
                 "membership_id": user.membership_id,
             },
+            "profile": profile_data,
             "wallet": wallet_data,
             "loan_eligibility": get_loan_eligibility(user),
             "active_loan": get_active_loan_summary(user),  # null if no active loan
