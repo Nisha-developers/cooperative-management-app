@@ -22,6 +22,7 @@ class WalletTransactionSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField(read_only=True)
     confirmed_by = serializers.StringRelatedField(read_only=True)
     payment_proof = WalletPaymentProofSerializer(read_only=True)
+    full_name = serializers.SerializerMethodField()
 
     class Meta:
         model = WalletTransaction
@@ -34,6 +35,7 @@ class WalletTransactionSerializer(serializers.ModelSerializer):
             "remark",
             "rejection_reason",
             "reference",
+            "full_name",
             "payment_proof",
             "created_by",
             "confirmed_by",
@@ -46,12 +48,18 @@ class WalletTransactionSerializer(serializers.ModelSerializer):
             "reference",
             "status",
             "rejection_reason",
+            "full_name",
             "payment_proof",
             "confirmed_by",
             "confirmed_at",
             "created_on",
             "updated_on",
         ]
+        
+    def get_full_name(self, obj):
+        if obj.created_by:
+            return obj.created_by.full_name
+        return None
 
 
 class CreditTransactionSerializer(serializers.ModelSerializer):

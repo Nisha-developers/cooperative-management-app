@@ -177,7 +177,7 @@ class AdminTransactionListView(APIView):
 
     def get(self, request):
         qs = WalletTransaction.objects.select_related(
-            "wallet__user", "payment_proof"
+            "wallet__user", "payment_proof", "created_by"
         ).order_by("-created_on")
 
         if status_filter := request.query_params.get("status"):
