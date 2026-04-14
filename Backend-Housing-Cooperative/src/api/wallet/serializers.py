@@ -32,6 +32,7 @@ class WalletTransactionSerializer(serializers.ModelSerializer):
             "status",
             "amount",
             "remark",
+            "rejection_reason",
             "reference",
             "payment_proof",
             "created_by",
@@ -44,6 +45,7 @@ class WalletTransactionSerializer(serializers.ModelSerializer):
             "uid",
             "reference",
             "status",
+            "rejection_reason",
             "payment_proof",
             "confirmed_by",
             "confirmed_at",
@@ -106,6 +108,17 @@ class DebitTransactionSerializer(serializers.ModelSerializer):
 
 class TransactionReviewSerializer(serializers.Serializer):
     remark = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class TransactionRejectSerializer(serializers.Serializer):
+    rejection_reason = serializers.CharField(
+        required=True,
+        allow_blank=False,
+        error_messages={
+            "required": "A rejection reason is required.",
+            "blank": "Rejection reason may not be blank.",
+        }
+    )
 
 
 class ClientProofUploadSerializer(serializers.ModelSerializer):

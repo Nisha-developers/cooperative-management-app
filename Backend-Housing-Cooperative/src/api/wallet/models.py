@@ -83,6 +83,7 @@ class WalletTransaction(models.Model):
     )
 
     remark = models.TextField(blank=True, default="")
+    rejection_reason = models.TextField(blank=True, default="")
 
     reference = models.CharField(
         max_length=120,
@@ -132,7 +133,6 @@ class WalletPaymentProof(models.Model):
         on_delete=models.CASCADE,
     )
 
-    # image = models.ImageField(upload_to="wallet/payment_proofs/%Y/%m/")
     image_url = models.TextField(blank=True, default="")
 
     uploaded_by = models.ForeignKey(

@@ -2,6 +2,7 @@ from django.db import transaction as db_transaction
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.exceptions import NotFound, ValidationError
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from config.permissions import IsAdminUserCustom
 from rest_framework.response import Response
@@ -20,12 +21,19 @@ from .serializers import (
     ClientProofUploadSerializer,
     CreditTransactionSerializer,
     DebitTransactionSerializer,
+    TransactionRejectSerializer,
     TransactionReviewSerializer,
     WalletPaymentProofSerializer,
     WalletSerializer,
     WalletSummarySerializer,
     WalletTransactionSerializer,
 )
+
+
+class StandardResultsSetPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = "page_size"
+    max_page_size = 50
 
 
 def _requires_client_proof(tx: WalletTransaction) -> bool:
@@ -61,10 +69,6 @@ def _get_transaction_or_404(uid: str) -> WalletTransaction:
 # ---------------------------------------------------------------------------
 
 class WalletDetailView(APIView):
-    """
-    GET /wallet/        → balance summary
-    GET /wallet/full/   → balance + full transaction list
-    """
     permission_classes = [IsAuthenticated]
 
     def get(self, request, full=False):
@@ -74,14 +78,6 @@ class WalletDetailView(APIView):
 
 
 class WalletTransactionListView(APIView):
-    """
-    GET /wallet/transactions/
-
-    Returns the caller's transactions ordered by most recent.
-    Optional query params:
-      ?status=PENDING | CONFIRMED | REJECTED
-      ?type=CREDIT | DEBIT
-    """
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -98,14 +94,6 @@ class WalletTransactionListView(APIView):
 
 
 class WalletTransactionHistoryView(APIView):
-    """
-    GET /wallet/transactions/history/
-
-    Returns all CONFIRMED transactions for the caller ordered by date,
-    oldest first — suitable for a chronological activity feed.
-    Optional query params:
-      ?type=CREDIT | DEBIT
-    """
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -124,13 +112,6 @@ class WalletTransactionHistoryView(APIView):
 
 
 class WalletCreditView(APIView):
-    """
-    POST /wallet/credit/
-
-    Body: { "source": "USER_TOPUP" | "TRANSFER", "amount": "100.00", "remark": "" }
-    Creates a PENDING CREDIT transaction. Balance updated only after admin approval.
-    If source=TRANSFER, attach proof via POST /wallet/transactions/<uid>/proof/
-    """
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -145,13 +126,6 @@ class WalletCreditView(APIView):
 
 
 class WalletDebitView(APIView):
-    """
-    POST /wallet/debit/
-
-    Body: { "source": "WITHDRAWAL" | "TRANSFER" | "PURCHASE", "amount": "50.00", "remark": "" }
-    Creates a PENDING DEBIT transaction. Balance updated only after admin approval.
-    For TRANSFER debits the admin attaches proof at approval time.
-    """
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -166,12 +140,6 @@ class WalletDebitView(APIView):
 
 
 class ClientProofUploadView(APIView):
-    """
-    POST /wallet/transactions/<uid>/proof/
-
-    Client attaches proof to their own PENDING CREDIT + TRANSFER transaction.
-    Body: { "image_url": "https://..." }
-    """
     permission_classes = [IsAuthenticated]
 
     def post(self, request, uid):
@@ -197,38 +165,35 @@ class ClientProofUploadView(APIView):
         return Response(WalletPaymentProofSerializer(proof).data, status=status.HTTP_201_CREATED)
 
 
-# ---------------------------------------------------------------------------
-# Admin views
-# ---------------------------------------------------------------------------
-
-class AdminPendingTransactionListView(APIView):
+class AdminTransactionListView(APIView):
     """
-    GET /admin/wallet/transactions/pending/
+    GET /admin/wallet/transactions/
 
-    Lists all PENDING transactions. Optional: ?type=CREDIT | DEBIT
+    Lists all transactions. Optional filters:
+      ?status=PENDING | CONFIRMED | REJECTED
+      ?type=CREDIT | DEBIT
     """
     permission_classes = [IsAdminUserCustom]
 
     def get(self, request):
-        qs = WalletTransaction.objects.filter(
-            status=WalletTransactionStatus.PENDING
-        ).select_related("wallet__user", "payment_proof")
+        qs = WalletTransaction.objects.select_related(
+            "wallet__user", "payment_proof"
+        ).order_by("-created_on")
+
+        if status_filter := request.query_params.get("status"):
+            qs = qs.filter(status=status_filter.upper())
 
         if type_filter := request.query_params.get("type"):
             qs = qs.filter(type=type_filter.upper())
 
-        return Response(WalletTransactionSerializer(qs, many=True).data)
+        paginator = StandardResultsSetPagination()
+        page = paginator.paginate_queryset(qs, request)
+        return paginator.get_paginated_response(
+            WalletTransactionSerializer(page, many=True).data
+        )
 
 
 class AdminApproveTransactionView(APIView):
-    """
-    POST /admin/wallet/transactions/<uid>/approve/
-
-    Body (optional): { "remark": "Verified — ref #ABC" }
-    CREDIT approved → balance += amount
-    DEBIT  approved → balance -= amount (re-checks funds)
-    DEBIT + TRANSFER requires proof uploaded first via /admin/.../proof/
-    """
     permission_classes = [IsAdminUserCustom]
 
     def post(self, request, uid):
@@ -277,17 +242,11 @@ class AdminApproveTransactionView(APIView):
 
 
 class AdminRejectTransactionView(APIView):
-    """
-    POST /admin/wallet/transactions/<uid>/reject/
-
-    Body (optional): { "remark": "Proof did not match" }
-    Sets status to REJECTED. Balance is never touched.
-    """
     permission_classes = [IsAdminUserCustom]
 
     def post(self, request, uid):
-        review_serializer = TransactionReviewSerializer(data=request.data)
-        review_serializer.is_valid(raise_exception=True)
+        reject_serializer = TransactionRejectSerializer(data=request.data)
+        reject_serializer.is_valid(raise_exception=True)
 
         tx = _get_transaction_or_404(uid)
 
@@ -296,28 +255,16 @@ class AdminRejectTransactionView(APIView):
                 f"Only PENDING transactions can be rejected. Current status: {tx.status}"
             )
 
-        admin_remark = review_serializer.validated_data.get("remark", "")
-        if admin_remark:
-            tx.remark = (
-                f"{tx.remark}\n[Admin] {admin_remark}".strip() if tx.remark
-                else f"[Admin] {admin_remark}"
-            )
-
+        tx.rejection_reason = reject_serializer.validated_data["rejection_reason"]
         tx.status = WalletTransactionStatus.REJECTED
         tx.confirmed_by = request.user
         tx.confirmed_at = timezone.now()
-        tx.save(update_fields=["status", "confirmed_by", "confirmed_at", "remark", "updated_on"])
+        tx.save(update_fields=["status", "confirmed_by", "confirmed_at", "rejection_reason", "updated_on"])
 
         return Response(WalletTransactionSerializer(tx).data, status=status.HTTP_200_OK)
 
 
 class AdminProofUploadView(APIView):
-    """
-    POST /admin/wallet/transactions/<uid>/proof/
-
-    Admin attaches proof to a PENDING DEBIT + TRANSFER transaction before approval.
-    Body: { "image_url": "https://..." }
-    """
     permission_classes = [IsAdminUserCustom]
 
     def post(self, request, uid):
