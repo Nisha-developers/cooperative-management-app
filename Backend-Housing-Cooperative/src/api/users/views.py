@@ -12,7 +12,7 @@ from .serializers import (
     CustomTokenObtainPairSerializer, UserListSerializer,
     UserRegistrationSerializer, UserProfileSerializer,
     AdminUserDetailSerializer, get_loan_eligibility, get_active_loan_summary,
-    UserProfileInlineSerializer
+    UserProfileInlineSerializer, ProfilePictureSerializer
 )
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
@@ -22,7 +22,7 @@ from django.shortcuts import get_object_or_404
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework.pagination import PageNumberPagination
-
+from api.utils.cloudinary import upload_avatar
 
 class StandardResultsSetPagination(PageNumberPagination):
     page_size = 10
@@ -180,6 +180,7 @@ class UserDetailView(APIView):
                 "full_name": user.full_name,
                 "is_admin": user.is_admin,
                 "membership_id": user.membership_id,
+                "avatar_url": profile.avatar_url or None,
             },
             "profile": profile_data,
             "wallet": wallet_data,
@@ -221,6 +222,26 @@ class UserProfileView(APIView):
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
+class ProfilePictureUploadView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+ 
+    def post(self, request):
+        serializer = ProfilePictureSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+ 
+        image_file = serializer.validated_data["image"]
+        profile, _ = UserProfile.objects.get_or_create(user=request.user)
+ 
+        avatar_url = upload_avatar(image_file, request.user.id)
+        profile.avatar_url = avatar_url
+        profile.save(update_fields=["avatar_url", "updated_at"])
+ 
+        return Response(
+            {"avatar_url": avatar_url},
+            status=status.HTTP_200_OK,
+        )
 
 class UserListView(ListAPIView):
     serializer_class = UserListSerializer

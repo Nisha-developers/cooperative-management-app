@@ -40,11 +40,6 @@ def get_loan_eligibility(user):
 
 
 def get_active_loan_summary(user):
-    """
-    Returns a compact loan summary if the user has an ACTIVE loan, else None.
-    Pulls total_outstanding and this_month_due from the shared service function
-    so the logic is never duplicated.
-    """
     try:
         loan = user.loans.filter(status="ACTIVE").select_related(None).prefetch_related("schedule").first()
     except Exception:
@@ -63,7 +58,6 @@ def get_active_loan_summary(user):
         "monthly_installment": str(loan.monthly_installment),
         "tenure_months": loan.tenure_months,
         "disbursed_at": loan.disbursed_at,
-        # balance fields
         "total_outstanding": str(summary["total_outstanding"]),
         "this_month_due": str(summary["this_month_due"]),
         "this_month_due_date": str(summary["this_month_due_date"]) if summary["this_month_due_date"] else None,
@@ -97,7 +91,6 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
     def validate(self, attrs):
         data = super().validate(attrs)
-
         user = self.user
 
         try:
@@ -107,6 +100,12 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
         wallet_data = WalletSummarySerializer(wallet).data if wallet else None
 
+        # Include avatar in login response
+        try:
+            avatar_url = user.profile.avatar_url or None
+        except Exception:
+            avatar_url = None
+
         data.update({
             "user": {
                 "id": user.id,
@@ -114,19 +113,25 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
                 "username": user.username,
                 "full_name": user.full_name,
                 "is_admin": user.is_admin,
-                "membership_id": user.membership_id
+                "membership_id": user.membership_id,
+                "avatar_url": avatar_url,
             },
             "wallet": wallet_data,
             "loan_eligibility": get_loan_eligibility(user),
-            "active_loan": get_active_loan_summary(user),  # null if no active loan
+            "active_loan": get_active_loan_summary(user),
         })
 
         return data
 
+
 class UserProfileInlineSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserProfile
-        fields = ['phone_number', 'account_number', 'account_name', 'bank_name', 'address', 'updated_at']
+        fields = [
+            'phone_number', 'account_number', 'account_name',
+            'bank_name', 'address', 'avatar_url', 'updated_at',
+        ]
+
 
 class UserProfileSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(source='user.email', read_only=True)
@@ -134,8 +139,17 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = UserProfile
-        fields = ['id', 'email', 'full_name', 'phone_number', 'account_number', 'account_name', 'bank_name', 'address', 'updated_at']
-        read_only_fields = ['id', 'email', 'full_name', 'updated_at']
+        fields = [
+            'id', 'email', 'full_name', 'phone_number',
+            'account_number', 'account_name', 'bank_name',
+            'address', 'avatar_url', 'updated_at',
+        ]
+        read_only_fields = ['id', 'email', 'full_name', 'avatar_url', 'updated_at']
+
+
+class ProfilePictureSerializer(serializers.Serializer):
+    """Accepts a raw image file upload for the profile avatar."""
+    image = serializers.ImageField()
 
 
 class UserListSerializer(serializers.ModelSerializer):

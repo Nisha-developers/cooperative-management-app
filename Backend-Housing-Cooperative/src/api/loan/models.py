@@ -13,8 +13,8 @@ class LoanStatus(models.TextChoices):
     DEFAULTED = "DEFAULTED", "Defaulted"
 
 
-MONTHLY_INTEREST_RATE = Decimal("0.005")
-MAX_TENURE_MONTHS = 11
+MONTHLY_INTEREST_RATE = Decimal("0.5")
+MAX_TENURE_MONTHS = 24
 
 
 class Loan(models.Model):

@@ -11,6 +11,7 @@ from .views import (
     UserRegistrationView,
     ResendVerificationCodeView,
     VerifyCodeView,
+    ProfilePictureUploadView,
     LogoutView
 )
 
@@ -24,6 +25,7 @@ urlpatterns = [
     path("forgot-password/reset/", ForgotPasswordResetView.as_view()),
     path('me/', UserDetailView.as_view(), name='user-detail'),
     path('profile/', UserProfileView.as_view(), name='user-profile'),
+    path('profile/avatar/', ProfilePictureUploadView.as_view(), name='profile-avatar'),
     path("get-users/", UserListView.as_view(), name="user-list"),
     path("get-users/<int:id>/", UserDetailByIdView.as_view(), name="user-detail"),
     path('logout/', LogoutView.as_view(), name='logout'),

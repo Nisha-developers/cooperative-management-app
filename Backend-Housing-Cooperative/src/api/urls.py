@@ -4,5 +4,6 @@ urlpatterns = [
    path('users/', include('api.users.urls')),
    path('wallet/', include('api.wallet.urls')),
    path('listings/', include('api.listings.urls')),
-   path('loan/', include('api.loan.urls'))
+   path('loan/', include('api.loan.urls')),
+   path('purchase/', include('api.purchase.urls')),
 ]

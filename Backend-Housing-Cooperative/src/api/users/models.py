@@ -86,6 +86,11 @@ class UserProfile(models.Model):
     account_name = models.CharField(max_length=100, blank=True, null=True)
     bank_name = models.CharField(max_length=100, blank=True, null=True)
     address = models.TextField(blank=True, null=True)
+    avatar_url = models.TextField(
+        blank=True,
+        default="",
+        help_text="Cloudinary URL for the user's profile picture",
+    )
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):

@@ -65,7 +65,6 @@ class Listing(models.Model):
     )
     is_furnished = models.BooleanField(null=True, blank=True)
 
-
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -74,3 +73,31 @@ class Listing(models.Model):
 
     def __str__(self):
         return f"{self.title} ({self.get_listing_type_display()} - {self.get_property_type_display()})"
+
+
+class ListingImage(models.Model):
+    """
+    Stores Cloudinary-hosted images for a listing.
+    Multiple images per listing are supported.
+    """
+    uid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+
+    listing = models.ForeignKey(
+        Listing,
+        related_name="images",
+        on_delete=models.CASCADE,
+    )
+
+    image_url = models.TextField(help_text="Cloudinary secure URL")
+    public_id = models.CharField(
+        max_length=255,
+        help_text="Cloudinary public_id — used for deletion",
+    )
+
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["uploaded_at"]
+
+    def __str__(self):
+        return f"Image({self.uid}) for {self.listing.title}"

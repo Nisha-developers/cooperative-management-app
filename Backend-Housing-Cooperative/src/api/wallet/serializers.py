@@ -11,12 +11,11 @@ from .models import (
 
 class WalletPaymentProofSerializer(serializers.ModelSerializer):
     uploaded_by = serializers.StringRelatedField(read_only=True)
-
+ 
     class Meta:
         model = WalletPaymentProof
         fields = ["uid", "image_url", "uploaded_by", "created_on", "updated_on"]
         read_only_fields = ["uid", "uploaded_by", "created_on", "updated_on"]
-
 
 class WalletTransactionSerializer(serializers.ModelSerializer):
     created_by = serializers.StringRelatedField(read_only=True)
@@ -128,17 +127,12 @@ class TransactionRejectSerializer(serializers.Serializer):
         }
     )
 
-
-class ClientProofUploadSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = WalletPaymentProof
-        fields = ["image_url"]
+class ClientProofUploadSerializer(serializers.Serializer):
+    image = serializers.ImageField()
 
 
 class AdminProofUploadSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = WalletPaymentProof
-        fields = ["image_url"]
+    image = serializers.ImageField()
 
 
 class WalletSerializer(serializers.ModelSerializer):

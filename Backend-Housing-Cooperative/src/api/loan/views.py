@@ -2,10 +2,17 @@ from decimal import Decimal
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import status
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from config.permissions import IsAdminUserCustom
+
+
+class StandardResultsSetPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = "page_size"
+    max_page_size = 50
 
 from .models import Loan, LoanRepaymentSchedule, LoanStatus
 from .serializers import (
@@ -64,7 +71,9 @@ class UserLoanListView(APIView):
 
     def get(self, request):
         loans = Loan.objects.filter(user=request.user)
-        return Response(LoanListSerializer(loans, many=True).data)
+        paginator = StandardResultsSetPagination()
+        page = paginator.paginate_queryset(loans, request)
+        return paginator.get_paginated_response(LoanListSerializer(page, many=True).data)
 
 
 class UserLoanDetailView(APIView):
@@ -167,7 +176,9 @@ class AdminLoanListView(APIView):
         status_filter = request.query_params.get("status")
         if status_filter:
             qs = qs.filter(status=status_filter.upper())
-        return Response(AdminLoanDetailSerializer(qs, many=True).data)
+        paginator = StandardResultsSetPagination()
+        page = paginator.paginate_queryset(qs, request)
+        return paginator.get_paginated_response(AdminLoanDetailSerializer(page, many=True).data)
 
 
 class AdminLoanDetailView(APIView):

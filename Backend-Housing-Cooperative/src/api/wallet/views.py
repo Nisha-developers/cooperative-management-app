@@ -16,6 +16,7 @@ from .models import (
     WalletTransactionStatus,
     WalletTransactionType,
 )
+from api.utils.cloudinary import upload_payment_proof
 from .serializers import (
     AdminProofUploadSerializer,
     ClientProofUploadSerializer,
@@ -28,7 +29,7 @@ from .serializers import (
     WalletSummarySerializer,
     WalletTransactionSerializer,
 )
-
+from rest_framework.parsers import MultiPartParser, FormParser
 
 class StandardResultsSetPagination(PageNumberPagination):
     page_size = 10
@@ -141,28 +142,39 @@ class WalletDebitView(APIView):
 
 class ClientProofUploadView(APIView):
     permission_classes = [IsAuthenticated]
-
+    parser_classes = [MultiPartParser, FormParser]
+    
     def post(self, request, uid):
         tx = _get_transaction_or_404(uid)
-
+ 
         if tx.wallet.user_id != request.user.pk:
             raise NotFound("Transaction not found.")
-
+ 
         if tx.status != WalletTransactionStatus.PENDING:
             raise ValidationError("Proof can only be attached to a PENDING transaction.")
-
+ 
         if not _requires_client_proof(tx):
             raise ValidationError(
                 "Payment proof is only required for TRANSFER credit transactions."
             )
-
+ 
         if hasattr(tx, "payment_proof"):
             raise ValidationError("Payment proof has already been uploaded.")
-
+ 
         serializer = ClientProofUploadSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        proof = serializer.save(transaction=tx, uploaded_by=request.user)
-        return Response(WalletPaymentProofSerializer(proof).data, status=status.HTTP_201_CREATED)
+ 
+        # ── Upload to Cloudinary ──────────────────────────────────────────────
+        image_file = serializer.validated_data["image"]
+        image_url = upload_payment_proof(image_file, tx.reference)
+        # ─────────────────────────────────────────────────────────────────────
+ 
+        proof = WalletPaymentProof.objects.create(
+            transaction=tx,
+            uploaded_by=request.user,
+            image_url=image_url,
+        )
+        return Response(WalletPaymentProofSerializer(proof).data, status=201)
 
 
 class AdminTransactionListView(APIView):
@@ -266,22 +278,32 @@ class AdminRejectTransactionView(APIView):
 
 class AdminProofUploadView(APIView):
     permission_classes = [IsAdminUserCustom]
-
+    parser_classes = [MultiPartParser, FormParser]
+ 
     def post(self, request, uid):
         tx = _get_transaction_or_404(uid)
-
+ 
         if tx.status != WalletTransactionStatus.PENDING:
             raise ValidationError("Proof can only be attached to a PENDING transaction.")
-
+ 
         if not _requires_admin_proof(tx):
             raise ValidationError(
                 "Admin proof upload is only applicable to DEBIT + TRANSFER transactions."
             )
-
+ 
         if hasattr(tx, "payment_proof"):
             raise ValidationError("Payment proof has already been uploaded for this transaction.")
-
+ 
         serializer = AdminProofUploadSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        proof = serializer.save(transaction=tx, uploaded_by=request.user)
-        return Response(WalletPaymentProofSerializer(proof).data, status=status.HTTP_201_CREATED)
+
+        image_file = serializer.validated_data["image"]
+        image_url = upload_payment_proof(image_file, tx.reference)
+ 
+        proof = WalletPaymentProof.objects.create(
+            transaction=tx,
+            uploaded_by=request.user,
+            image_url=image_url,
+        )
+        return Response(WalletPaymentProofSerializer(proof).data, status=201)
+ 
