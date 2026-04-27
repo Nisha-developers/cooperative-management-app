@@ -72,6 +72,15 @@ class LoanApplicationSerializer(serializers.ModelSerializer):
             )
 
         return data
+    
+    def create(self, validated_data):
+        summary = Loan.calculate_summary(
+            validated_data["principal"],
+            validated_data["tenure_months"],
+        )
+        validated_data["total_repayable"] = summary["total_repayable"]
+        validated_data["monthly_installment"] = summary["monthly_installment"]
+        return super().create(validated_data)
 
 
 class RepaymentScheduleSerializer(serializers.ModelSerializer):

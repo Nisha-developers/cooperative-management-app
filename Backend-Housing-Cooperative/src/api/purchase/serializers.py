@@ -125,6 +125,17 @@ class PurchaseApplicationSerializer(serializers.Serializer):
             )
 
         if data["purchase_type"] == PurchaseType.INSTALLMENT:
+            # Block installment purchase if user has an active loan
+            if user.loans.filter(status="ACTIVE").exists():
+                raise serializers.ValidationError(
+                    {
+                        "purchase_type": (
+                            "You cannot purchase on installment while you have an active loan. "
+                            "Please settle your loan before proceeding."
+                        )
+                    }
+                )
+
             if not listing.allows_installment:
                 raise serializers.ValidationError(
                     {"purchase_type": "This property does not support installment payments."}
