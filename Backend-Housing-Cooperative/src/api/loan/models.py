@@ -56,7 +56,7 @@ class Loan(models.Model):
     approved_at = models.DateTimeField(null=True, blank=True)
     disbursed_at = models.DateTimeField(null=True, blank=True)
     remark = models.TextField(blank=True, default="")
-
+    rejection_reason = models.TextField(blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

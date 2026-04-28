@@ -115,7 +115,7 @@ class LoanDetailSerializer(serializers.ModelSerializer):
         fields = [
             "uid", "principal", "tenure_months", "interest_rate",
             "total_repayable", "monthly_installment", "status",
-            "approved_at", "disbursed_at", "remark", "created_at",
+            "approved_at", "disbursed_at", "remark", "created_at", "rejection_reason",
             "balance_summary",
             "schedule",
         ]
@@ -137,6 +137,15 @@ class LoanListSerializer(serializers.ModelSerializer):
             "status", "created_at",
         ]
 
+class LoanRejectSerializer(serializers.Serializer):
+    rejection_reason = serializers.CharField(
+        required=True,
+        allow_blank=False,
+        error_messages={
+            "required": "A rejection reason is required.",
+            "blank": "Rejection reason may not be blank.",
+        }
+    )
 
 class AdminLoanDetailSerializer(serializers.ModelSerializer):
     schedule = RepaymentScheduleSerializer(many=True, read_only=True)

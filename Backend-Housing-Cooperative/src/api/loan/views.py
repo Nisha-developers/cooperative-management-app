@@ -17,7 +17,7 @@ class StandardResultsSetPagination(PageNumberPagination):
 from .models import Loan, LoanRepaymentSchedule, LoanStatus
 from .serializers import (
     LoanPreviewSerializer, LoanApplicationSerializer,
-    LoanDetailSerializer, LoanListSerializer, AdminLoanDetailSerializer,
+    LoanDetailSerializer, LoanListSerializer, AdminLoanDetailSerializer,LoanRejectSerializer,
     check_loan_eligibility,
 )
 from .services import disburse_loan, process_repayment
@@ -208,10 +208,14 @@ class AdminApproveLoanView(APIView):
 
 
 class AdminRejectLoanView(APIView):
-    """POST /admin/loans/<uid>/reject/  Body: { "remark": "..." }"""
+    """POST /admin/loans/<uid>/reject/  Body: { "rejection_reason": "..." }"""
     permission_classes = [IsAdminUserCustom]
 
     def post(self, request, uid):
+        # Validate first, before touching the DB
+        reject_serializer = LoanRejectSerializer(data=request.data)
+        reject_serializer.is_valid(raise_exception=True)
+
         loan = get_object_or_404(Loan, uid=uid)
 
         if loan.status != LoanStatus.PENDING:
@@ -221,8 +225,8 @@ class AdminRejectLoanView(APIView):
             )
 
         loan.status = LoanStatus.REJECTED
-        loan.remark = request.data.get("remark", "")
+        loan.rejection_reason = reject_serializer.validated_data["rejection_reason"]
         loan.approved_by = request.user
         loan.approved_at = timezone.now()
-        loan.save()
+        loan.save(update_fields=["status", "rejection_reason", "approved_by", "approved_at", "updated_at"])
         return Response(AdminLoanDetailSerializer(loan).data, status=status.HTTP_200_OK)
