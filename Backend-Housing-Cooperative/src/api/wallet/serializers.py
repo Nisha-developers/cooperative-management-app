@@ -131,7 +131,7 @@ class ClientProofUploadSerializer(serializers.Serializer):
     image = serializers.ImageField()
 
 
-class AdminProofUploadSerializer(serializers.ModelSerializer):
+class AdminProofUploadSerializer(serializers.Serializer):
     image = serializers.ImageField()
 
 

@@ -57,13 +57,16 @@ class ListingRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
         return [IsAdminUserCustom()]
 
 
+MAX_IMAGES_PER_LISTING = 8
+
+
 class ListingImageUploadView(APIView):
     """
     POST /listings/<id>/images/
-    Upload one image for a listing. Admin only.
-    Expects multipart/form-data with field: image
+    Upload one or more images for a listing. Admin only.
+    Expects multipart/form-data with field: images (accepts multiple files).
 
-    A listing can have multiple images — call this endpoint once per image.
+    A listing can have at most 8 images total.
     """
     permission_classes = [IsAdminUserCustom]
     parser_classes = [MultiPartParser, FormParser]
@@ -71,20 +74,48 @@ class ListingImageUploadView(APIView):
     def post(self, request, id):
         listing = get_object_or_404(Listing, id=id)
 
-        serializer = ListingImageUploadSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        image_files = request.FILES.getlist("images")
+        if not image_files:
+            return Response(
+                {"images": "At least one image file is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        image_file = serializer.validated_data["image"]
-        result = upload_listing_image(image_file, str(listing.id))
+        current_count = listing.images.count()
+        slots_remaining = MAX_IMAGES_PER_LISTING - current_count
 
-        listing_image = ListingImage.objects.create(
-            listing=listing,
-            image_url=result["url"],
-            public_id=result["public_id"],
-        )
+        if slots_remaining <= 0:
+            return Response(
+                {"images": f"This listing already has the maximum of {MAX_IMAGES_PER_LISTING} images."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if len(image_files) > slots_remaining:
+            return Response(
+                {
+                    "images": (
+                        f"Only {slots_remaining} image slot(s) remaining. "
+                        f"You tried to upload {len(image_files)}."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        created_images = []
+        for image_file in image_files:
+            serializer = ListingImageUploadSerializer(data={"image": image_file})
+            serializer.is_valid(raise_exception=True)
+
+            result = upload_listing_image(serializer.validated_data["image"], str(listing.id))
+            listing_image = ListingImage.objects.create(
+                listing=listing,
+                image_url=result["url"],
+                public_id=result["public_id"],
+            )
+            created_images.append(listing_image)
 
         return Response(
-            ListingImageSerializer(listing_image).data,
+            ListingImageSerializer(created_images, many=True).data,
             status=status.HTTP_201_CREATED,
         )
 
