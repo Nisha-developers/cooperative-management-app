@@ -87,6 +87,18 @@ class PurchaseApplyView(APIView):
             # computed and stored when admin approves to avoid stale snapshots.
 
         purchase = Purchase.objects.create(**purchase_kwargs)
+
+        from api.users.tasks import send_purchase_application_received
+        try:
+            send_purchase_application_received(
+                request.user.email,
+                request.user.membership_id or request.user.email,
+                listing.title,
+                data["purchase_type"],
+            )
+        except Exception:
+            pass
+
         return Response(
             PurchaseDetailSerializer(purchase).data,
             status=status.HTTP_201_CREATED,
@@ -229,6 +241,20 @@ class AdminApprovePurchaseView(APIView):
 
         approve_purchase(purchase, request.user)
         purchase.refresh_from_db()
+
+        from api.users.tasks import send_purchase_approved
+        amount = purchase.initial_deposit if purchase.purchase_type == PurchaseType.INSTALLMENT else purchase.property_price
+        try:
+            send_purchase_approved(
+                purchase.user.email,
+                purchase.user.membership_id or purchase.user.email,
+                purchase.listing.title,
+                purchase.purchase_type,
+                amount,
+            )
+        except Exception:
+            pass
+
         return Response(AdminPurchaseDetailSerializer(purchase).data, status=status.HTTP_200_OK)
 
 
@@ -250,5 +276,16 @@ class AdminRejectPurchaseView(APIView):
         purchase.approved_by = request.user
         purchase.approved_at = timezone.now()
         purchase.save()
+
+        from api.users.tasks import send_purchase_rejected
+        try:
+            send_purchase_rejected(
+                purchase.user.email,
+                purchase.user.membership_id or purchase.user.email,
+                purchase.listing.title,
+                purchase.remark,
+            )
+        except Exception:
+            pass
 
         return Response(AdminPurchaseDetailSerializer(purchase).data, status=status.HTTP_200_OK)

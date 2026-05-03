@@ -249,7 +249,23 @@ class UserListView(ListAPIView):
     pagination_class = StandardResultsSetPagination
 
     def get_queryset(self):
-        return User.objects.filter(is_admin=False).order_by("-id")
+        qs = User.objects.filter(is_admin=False).order_by("-id")
+        email = self.request.query_params.get("email")
+        if email:
+            qs = qs.filter(email__iexact=email)
+        return qs
+
+
+class AdminUserDetailByEmailView(APIView):
+    """GET /users/get-users/by-email/?email=user@example.com"""
+    permission_classes = [IsAdminUserCustom]
+
+    def get(self, request):
+        email = request.query_params.get("email")
+        if not email:
+            return Response({"error": "email query parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
+        user = get_object_or_404(User, email__iexact=email)
+        return Response(AdminUserDetailSerializer(user).data, status=status.HTTP_200_OK)
 
 
 class UserDetailByIdView(RetrieveAPIView):

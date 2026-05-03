@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'api.listings',
     'api.wallet',
     'api.purchase',
+    'api.rent',
     'corsheaders',
     'drf_spectacular',
     'django_filters',

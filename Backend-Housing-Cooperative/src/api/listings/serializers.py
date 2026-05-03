@@ -50,9 +50,9 @@ class ListingSerializer(serializers.ModelSerializer):
                     {"minimum_initial_deposit": "Required when installment is allowed."}
                 )
 
-        if listing_type == ListingType.RENT and not data.get("rent_duration"):
+        if listing_type == ListingType.RENT and not data.get("price_per_day"):
             raise serializers.ValidationError(
-                {"rent_duration": "Rent duration is required for rental listings (in months)."}
+                {"price_per_day": "A daily rate (price_per_day) is required for rental listings."}
             )
 
         return data

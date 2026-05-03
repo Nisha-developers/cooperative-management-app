@@ -1,5 +1,6 @@
 from django.urls import path
 from .views import (
+    AdminUserDetailByEmailView,
     CustomTokenObtainPairView,
     ForgotPasswordRequestView,
     ForgotPasswordVerifyCodeView,
@@ -27,6 +28,7 @@ urlpatterns = [
     path('profile/', UserProfileView.as_view(), name='user-profile'),
     path('profile/avatar/', ProfilePictureUploadView.as_view(), name='profile-avatar'),
     path("get-users/", UserListView.as_view(), name="user-list"),
-    path("get-users/<int:id>/", UserDetailByIdView.as_view(), name="user-detail"),
+    path("get-users/by-email/", AdminUserDetailByEmailView.as_view(), name="user-detail-by-email"),
+    path("get-users/<int:id>/", UserDetailByIdView.as_view(), name="user-detail-by-id"),
     path('logout/', LogoutView.as_view(), name='logout'),
 ]

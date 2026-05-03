@@ -62,6 +62,18 @@ class LoanApplyView(APIView):
         )
         serializer.is_valid(raise_exception=True)
         loan = serializer.save(user=request.user)
+
+        from api.users.tasks import send_loan_application_received
+        try:
+            send_loan_application_received(
+                request.user.email,
+                request.user.membership_id or request.user.email,
+                loan.principal,
+                loan.tenure_months,
+            )
+        except Exception:
+            pass
+
         return Response(LoanDetailSerializer(loan).data, status=status.HTTP_201_CREATED)
 
 
@@ -204,6 +216,19 @@ class AdminApproveLoanView(APIView):
             )
 
         disburse_loan(loan, request.user)
+
+        from api.users.tasks import send_loan_approved
+        try:
+            send_loan_approved(
+                loan.user.email,
+                loan.user.membership_id or loan.user.email,
+                loan.principal,
+                loan.monthly_installment,
+                loan.tenure_months,
+            )
+        except Exception:
+            pass
+
         return Response(AdminLoanDetailSerializer(loan).data, status=status.HTTP_200_OK)
 
 
@@ -229,4 +254,15 @@ class AdminRejectLoanView(APIView):
         loan.approved_by = request.user
         loan.approved_at = timezone.now()
         loan.save(update_fields=["status", "rejection_reason", "approved_by", "approved_at", "updated_at"])
+
+        from api.users.tasks import send_loan_rejected
+        try:
+            send_loan_rejected(
+                loan.user.email,
+                loan.user.membership_id or loan.user.email,
+                loan.rejection_reason,
+            )
+        except Exception:
+            pass
+
         return Response(AdminLoanDetailSerializer(loan).data, status=status.HTTP_200_OK)

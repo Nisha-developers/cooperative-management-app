@@ -95,12 +95,40 @@ def process_repayment(schedule: LoanRepaymentSchedule):
             if not loan.schedule.filter(is_paid=False).exists():
                 loan.status = LoanStatus.COMPLETED
                 loan.save(update_fields=["status", "updated_at"])
+
+                from api.users.tasks import send_loan_installment_paid
+                try:
+                    send_loan_installment_paid(
+                        loan.user.email,
+                        loan.user.membership_id or loan.user.email,
+                        schedule.installment_number,
+                        loan.tenure_months,
+                        amount_owed,
+                        0,
+                    )
+                except Exception:
+                    pass
+
                 return {
                     "status": "success",
                     "message": "Installment paid. Loan fully repaid — congratulations!",
                     "amount_deducted": str(amount_owed),
                     "loan_completed": True,
                 }
+
+            from api.users.tasks import send_loan_installment_paid
+            remaining = loan.schedule.filter(is_paid=False).count()
+            try:
+                send_loan_installment_paid(
+                    loan.user.email,
+                    loan.user.membership_id or loan.user.email,
+                    schedule.installment_number,
+                    loan.tenure_months,
+                    amount_owed,
+                    remaining,
+                )
+            except Exception:
+                pass
 
             return {
                 "status": "success",
@@ -120,6 +148,30 @@ def process_repayment(schedule: LoanRepaymentSchedule):
             if schedule.installment_number == loan.tenure_months:
                 loan.status = LoanStatus.DEFAULTED
                 loan.save(update_fields=["status", "updated_at"])
+
+            from api.users.tasks import send_loan_installment_failed
+            try:
+                send_loan_installment_failed(
+                    loan.user.email,
+                    loan.user.membership_id or loan.user.email,
+                    schedule.installment_number,
+                    amount_owed,
+                    wallet.balance,
+                )
+            except Exception:
+                pass
+
+            return {
+                "status": "insufficient_funds",
+                "message": (
+                    f"Insufficient wallet balance. ₦{amount_owed:,.2f} required, "
+                    f"₦{wallet.balance:,.2f} available. "
+                    f"A penalty of ₦{penalty:,.2f} has been added."
+                ),
+                "amount_required": str(amount_owed),
+                "wallet_balance": str(wallet.balance),
+                "penalty_added": str(penalty),
+            }
 
             return {
                 "status": "insufficient_funds",

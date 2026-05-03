@@ -65,6 +65,18 @@ class LoanApplicationSerializer(serializers.ModelSerializer):
                 "You already have an active or pending loan. Repay it before applying again."
             )
 
+        # 3. Block loan if user is currently paying purchase installments
+        from api.purchase.models import Purchase, PurchaseStatus, PurchaseType
+        if Purchase.objects.filter(
+            user=user,
+            status=PurchaseStatus.ACTIVE,
+            purchase_type=PurchaseType.INSTALLMENT,
+        ).exists():
+            raise serializers.ValidationError(
+                "You cannot apply for a loan while you have an active property installment plan. "
+                "Complete your installment payments before applying."
+            )
+
         # 3. Check principal against max allowed (2x balance)
         if principal > max_loan_amount:
             raise serializers.ValidationError(

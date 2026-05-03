@@ -178,6 +178,20 @@ def process_installment_payment(schedule: PurchaseInstallmentSchedule) -> dict:
                 purchase.listing.status = ListingStatus.SOLD
                 purchase.listing.save(update_fields=["status", "updated_at"])
 
+                from api.users.tasks import send_purchase_installment_paid
+                try:
+                    send_purchase_installment_paid(
+                        purchase.user.email,
+                        purchase.user.membership_id or purchase.user.email,
+                        purchase.listing.title,
+                        schedule.installment_number,
+                        purchase.tenure_months,
+                        amount_due,
+                        0,
+                    )
+                except Exception:
+                    pass
+
                 return {
                     "status": "success",
                     "message": (
@@ -187,6 +201,21 @@ def process_installment_payment(schedule: PurchaseInstallmentSchedule) -> dict:
                     "amount_deducted": str(amount_due),
                     "purchase_completed": True,
                 }
+
+            from api.users.tasks import send_purchase_installment_paid
+            remaining = purchase.schedule.filter(is_paid=False).count()
+            try:
+                send_purchase_installment_paid(
+                    purchase.user.email,
+                    purchase.user.membership_id or purchase.user.email,
+                    purchase.listing.title,
+                    schedule.installment_number,
+                    purchase.tenure_months,
+                    amount_due,
+                    remaining,
+                )
+            except Exception:
+                pass
 
             return {
                 "status": "success",

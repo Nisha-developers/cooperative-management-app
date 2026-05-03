@@ -50,9 +50,9 @@ class Listing(models.Model):
     )
 
     # Rent-specific fields
-    rent_duration = models.PositiveIntegerField(
-        null=True, blank=True,
-        help_text="Duration of the rental agreement in months"
+    price_per_day = models.DecimalField(
+        max_digits=14, decimal_places=2, null=True, blank=True,
+        help_text="Daily rental rate (price per day)"
     )
 
     # Property details (land won't use bedrooms/bathrooms etc.)
