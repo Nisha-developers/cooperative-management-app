@@ -7,7 +7,6 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from config.permissions import IsAdminUserCustom
-from api.listings.models import ListingStatus
 
 from .models import Rent, RentStatus
 from .serializers import (
@@ -72,6 +71,9 @@ class RentApplyView(APIView):
             duration_days=data["duration_days"],
             total_rent_cost=data["total_cost"],
         )
+
+        # Lock the listing so it won't appear available to other applicants
+        listing.mark_pending()
 
         from api.users.tasks import send_rent_application_received
         try:
@@ -194,6 +196,9 @@ class AdminRejectRentView(APIView):
         rent.approved_by = request.user
         rent.approved_at = timezone.now()
         rent.save(update_fields=["status", "rejection_reason", "approved_by", "approved_at", "updated_at"])
+
+        # Release the listing back to available so others can apply
+        rent.listing.mark_available()
 
         from api.users.tasks import send_rent_rejected
         try:

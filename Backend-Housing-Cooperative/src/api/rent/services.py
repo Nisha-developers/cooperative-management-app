@@ -11,8 +11,6 @@ from api.wallet.models import (
     WalletTransactionSource,
     WalletTransactionStatus,
 )
-from api.listings.models import ListingStatus
-
 from .models import Rent, RentStatus
 
 
@@ -60,5 +58,4 @@ def approve_rent(rent: Rent, admin_user):
         rent.wallet_transaction = tx
         rent.save()
 
-        listing.status = ListingStatus.RENTED
-        listing.save(update_fields=["status", "updated_at"])
+        listing.mark_rented()

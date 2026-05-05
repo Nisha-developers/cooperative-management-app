@@ -124,17 +124,6 @@ class UserPurchaseDetailView(APIView):
 
 
 class PurchasePayInstallmentView(APIView):
-    """
-    POST /purchase/<uid>/pay/
-
-    Immediately pays the current month's installment from the user's wallet.
-    The daily scheduler will also call process_installment_payment — it skips
-    any installment already marked is_paid=True, so manual early payment is safe.
-
-    Optional body: { "installment_number": 3 }
-    If omitted, auto-selects the earliest unpaid installment due this month,
-    falling back to the next upcoming unpaid installment.
-    """
     permission_classes = [IsAuthenticated]
 
     def post(self, request, uid):

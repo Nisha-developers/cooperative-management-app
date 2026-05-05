@@ -74,6 +74,21 @@ class Listing(models.Model):
     def __str__(self):
         return f"{self.title} ({self.get_listing_type_display()} - {self.get_property_type_display()})"
 
+    def mark_pending(self):
+        """Called when a rent application is submitted — listing is no longer freely available."""
+        self.status = ListingStatus.PENDING
+        self.save(update_fields=["status", "updated_at"])
+
+    def mark_rented(self):
+        """Called when a rent is approved and payment is confirmed."""
+        self.status = ListingStatus.RENTED
+        self.save(update_fields=["status", "updated_at"])
+
+    def mark_available(self):
+        """Called when a rent application is rejected/cancelled — listing becomes available again."""
+        self.status = ListingStatus.AVAILABLE
+        self.save(update_fields=["status", "updated_at"])
+
 
 class ListingImage(models.Model):
     """
