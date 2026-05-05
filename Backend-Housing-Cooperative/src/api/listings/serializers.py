@@ -14,7 +14,6 @@ class ListingImageUploadSerializer(serializers.Serializer):
 
 
 class ListingSerializer(serializers.ModelSerializer):
-    """Full serializer — used for create, retrieve, update."""
     images = ListingImageSerializer(many=True, read_only=True)
 
     class Meta:
@@ -50,10 +49,15 @@ class ListingSerializer(serializers.ModelSerializer):
                     {"minimum_initial_deposit": "Required when installment is allowed."}
                 )
 
-        if listing_type == ListingType.RENT and not data.get("price_per_day"):
-            raise serializers.ValidationError(
-                {"price_per_day": "A daily rate (price_per_day) is required for rental listings."}
-            )
+        if listing_type == ListingType.RENT:
+            price_per_day = data.get("price_per_day")
+            if not price_per_day:
+                raise serializers.ValidationError(
+                    {"price_per_day": "A daily rate is required for rental listings."}
+                )
+
+            # AUTO MIRROR PRICE
+            data["price"] = price_per_day
 
         return data
 
@@ -71,6 +75,7 @@ class ListingListSerializer(serializers.ModelSerializer):
             "property_type",
             "status",
             "price",
+            "price_per_day",
             "allows_installment",
             "state",
             "city",
