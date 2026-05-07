@@ -96,6 +96,8 @@ class UserRentListView(APIView):
 
     def get(self, request):
         rents = Rent.objects.filter(user=request.user).select_related("listing")
+        if status_filter := request.query_params.get("status"):
+            rents = rents.filter(status=status_filter.upper())
         paginator = StandardResultsSetPagination()
         page = paginator.paginate_queryset(rents, request)
         return paginator.get_paginated_response(RentListSerializer(page, many=True).data)
