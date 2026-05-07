@@ -12,7 +12,7 @@ from .serializers import (
     CustomTokenObtainPairSerializer, UserListSerializer,
     UserRegistrationSerializer, UserProfileSerializer,
     AdminUserDetailSerializer, get_loan_eligibility, get_active_loan_summary,
-    UserProfileInlineSerializer, ProfilePictureSerializer
+    get_active_installment_summary, UserProfileInlineSerializer, ProfilePictureSerializer
 )
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
@@ -185,7 +185,8 @@ class UserDetailView(APIView):
             "profile": profile_data,
             "wallet": wallet_data,
             "loan_eligibility": get_loan_eligibility(user),
-            "active_loan": get_active_loan_summary(user),  # null if no active loan
+            "active_loan": get_active_loan_summary(user),
+            "active_installment": get_active_installment_summary(user),
         }, status=status.HTTP_200_OK)
 
 

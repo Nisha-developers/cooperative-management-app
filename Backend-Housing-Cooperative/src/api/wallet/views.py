@@ -91,7 +91,9 @@ class WalletTransactionListView(APIView):
         if type_filter := request.query_params.get("type"):
             qs = qs.filter(type=type_filter.upper())
 
-        return Response(WalletTransactionSerializer(qs, many=True).data)
+        paginator = StandardResultsSetPagination()
+        page = paginator.paginate_queryset(qs, request)
+        return paginator.get_paginated_response(WalletTransactionSerializer(page, many=True).data)
 
 
 class WalletTransactionHistoryView(APIView):
@@ -109,7 +111,9 @@ class WalletTransactionHistoryView(APIView):
         if type_filter := request.query_params.get("type"):
             qs = qs.filter(type=type_filter.upper())
 
-        return Response(WalletTransactionSerializer(qs, many=True).data)
+        paginator = StandardResultsSetPagination()
+        page = paginator.paginate_queryset(qs, request)
+        return paginator.get_paginated_response(WalletTransactionSerializer(page, many=True).data)
 
 
 class WalletCreditView(APIView):
@@ -306,4 +310,3 @@ class AdminProofUploadView(APIView):
             image_url=image_url,
         )
         return Response(WalletPaymentProofSerializer(proof).data, status=201)
- 

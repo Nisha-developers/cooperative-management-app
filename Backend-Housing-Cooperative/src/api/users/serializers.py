@@ -66,6 +66,43 @@ def get_active_loan_summary(user):
     }
 
 
+def get_active_installment_summary(user):
+    """Returns a summary of the user's active installment purchase, if any."""
+    try:
+        purchase = (
+            user.purchases
+            .filter(status="ACTIVE", purchase_type="INSTALLMENT")
+            .select_related("listing")
+            .prefetch_related("schedule")
+            .first()
+        )
+    except Exception:
+        return None
+
+    if not purchase:
+        return None
+
+    from api.purchase.services import get_purchase_balance_summary
+    summary = get_purchase_balance_summary(purchase)
+
+    return {
+        "purchase_uid": str(purchase.uid),
+        "listing_title": purchase.listing.title,
+        "listing_address": purchase.listing.address,
+        "property_price": str(purchase.property_price),
+        "initial_deposit": str(purchase.initial_deposit),
+        "monthly_installment": str(purchase.monthly_installment),
+        "total_repayable": str(purchase.total_repayable),
+        "tenure_months": purchase.tenure_months,
+        "approved_at": purchase.approved_at,
+        "total_outstanding": str(summary["total_outstanding"]),
+        "this_month_due": str(summary["this_month_due"]),
+        "this_month_due_date": str(summary["this_month_due_date"]) if summary["this_month_due_date"] else None,
+        "this_month_installment_number": summary["this_month_installment_number"],
+        "installments_remaining": summary["installments_remaining"],
+    }
+
+
 class UserRegistrationSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
@@ -119,6 +156,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             "wallet": wallet_data,
             "loan_eligibility": get_loan_eligibility(user),
             "active_loan": get_active_loan_summary(user),
+            "active_installment": get_active_installment_summary(user),
         })
 
         return data
@@ -170,6 +208,7 @@ class AdminUserDetailSerializer(serializers.ModelSerializer):
     profile = serializers.SerializerMethodField()
     loan_eligibility = serializers.SerializerMethodField()
     active_loan = serializers.SerializerMethodField()
+    active_installment = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -177,6 +216,7 @@ class AdminUserDetailSerializer(serializers.ModelSerializer):
             "id", "email", "username", "full_name",
             "is_admin", "membership_id", "wallet",
             "profile", "loan_eligibility", "active_loan",
+            "active_installment",
         ]
 
     def get_wallet(self, obj):
@@ -195,6 +235,9 @@ class AdminUserDetailSerializer(serializers.ModelSerializer):
     def get_active_loan(self, obj):
         return get_active_loan_summary(obj)
 
+    def get_active_installment(self, obj):
+        return get_active_installment_summary(obj)
+
     def to_representation(self, instance):
         representation = super().to_representation(instance)
         wallet_data = representation.pop("wallet")
@@ -205,4 +248,5 @@ class AdminUserDetailSerializer(serializers.ModelSerializer):
             "profile": profile_data,
             "loan_eligibility": representation.pop("loan_eligibility"),
             "active_loan": representation.pop("active_loan"),
+            "active_installment": representation.pop("active_installment"),
         }

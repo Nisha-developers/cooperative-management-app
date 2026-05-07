@@ -83,6 +83,8 @@ class UserLoanListView(APIView):
 
     def get(self, request):
         loans = Loan.objects.filter(user=request.user)
+        if status_filter := request.query_params.get("status"):
+            loans = loans.filter(status=status_filter.upper())
         paginator = StandardResultsSetPagination()
         page = paginator.paginate_queryset(loans, request)
         return paginator.get_paginated_response(LoanListSerializer(page, many=True).data)
