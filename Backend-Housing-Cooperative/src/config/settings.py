@@ -179,11 +179,19 @@ SIMPLE_JWT = {
 
 # DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
-EMAIL_HOST = "mail"
-EMAIL_PORT = 1025
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# EMAIL_HOST = "mail"
+# EMAIL_PORT = 1025
+# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 
-DEFAULT_FROM_EMAIL = "Bethel Housing Cooperative <noreply@myapp.com>"
+# DEFAULT_FROM_EMAIL = "Bethel Housing Cooperative <noreply@myapp.com>"
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
+DEFAULT_FROM_EMAIL = f"Bethel Housing Cooperative <{os.environ.get('EMAIL_HOST_USER')}>"
+
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "https://frontend-cooperative.vercel.app",
