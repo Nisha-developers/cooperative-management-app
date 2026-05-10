@@ -119,7 +119,10 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             is_active=False
         )
         user.set_password(password)
-        user.is_admin = is_admin
+        if is_admin:
+            user.is_admin = True
+            user.is_staff = True
+            user.is_superuser = True
         user.save()
         return user
 
