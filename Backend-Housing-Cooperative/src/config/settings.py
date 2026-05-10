@@ -186,6 +186,7 @@ EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 DEFAULT_FROM_EMAIL = "Bethel Housing Cooperative <noreply@myapp.com>"
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
+    "https://frontend-cooperative.vercel.app",
 ] #change later 
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_HEADERS = [
