@@ -16,3 +16,4 @@ django-filter
 django-q2
 python-dateutil
 cloudinary==1.41.0
+resend
